@@ -42,6 +42,12 @@ interface GameState {
   moveHistory?: string[];
   lastActivityTime: number;
   createdAt: number;
+  clock?: {
+    white: number;  // milliseconds remaining
+    black: number;
+    lastMoveTime?: number;  // timestamp of last move
+    started: boolean;
+  };
 }
 
 const games = new Map<string, GameState>();
@@ -107,6 +113,7 @@ io.on('connection', (socket) => {
 
       const gameId = uuidv4();
       const now = Date.now();
+      const INITIAL_TIME = 5 * 60 * 1000; // 5 minutes in milliseconds
       
       const newGame: GameState = {
         gameId,
@@ -117,18 +124,22 @@ io.on('connection', (socket) => {
           black: null
         },
         spectators: [],
-        moveHistory: [], 
+        moveHistory: [],
         captures: {
           white: [],
           black: []
         },
         lastActivityTime: now,
-        createdAt: now
+        createdAt: now,
+        clock: {
+          white: INITIAL_TIME,
+          black: INITIAL_TIME,
+          started: false
+        }
       };
       
       games.set(gameId, newGame);
       socket.join(gameId);
-      console.log('Game created:', gameId);
       io.to(gameId).emit('gameCreated', newGame);
       logGameState('Game Created');
     } catch (error) {
@@ -139,8 +150,12 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', (gameId: string) => {
     try {
+      console.log('Attempting to join game:', gameId);
       const game = games.get(gameId);
+      
       if (!game) {
+        console.log('Game not found:', gameId);
+        console.log('Available games:', Array.from(games.keys()));
         socket.emit('error', 'Game not found');
         return;
       }
@@ -151,10 +166,7 @@ io.on('connection', (socket) => {
       // If player is already in the game (reconnecting)
       if (game.players.white === socket.id || game.players.black === socket.id) {
         socket.join(gameId);
-        socket.emit('gameJoined', {
-          ...game,
-          role: game.players.white === socket.id ? 'white' : 'black'
-        });
+        socket.emit('gameJoined', game);
         return;
       }
 
@@ -182,16 +194,9 @@ io.on('connection', (socket) => {
         socket.join(gameId);
         
         games.set(gameId, game);
-        socket.emit('gameJoined', {
-          ...game,
-          role: 'black'
-        });
-        io.to(gameId).emit('gameState', game);
+        io.to(gameId).emit('gameJoined', game);
         logGameState('Player Joined');
-        return;
       }
-
-      socket.emit('error', 'Unable to join game');
     } catch (error) {
       console.error('Error joining game:', error);
       socket.emit('error', 'Failed to join game');
@@ -206,79 +211,126 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Update activity time
-      game.lastActivityTime = Date.now();
-
       const chess = new Chess(game.position);
       
-      // Check if it's the player's turn
-      const isWhite = chess.turn() === 'w';
-      if ((isWhite && game.players.white !== socket.id) || 
-          (!isWhite && game.players.black !== socket.id)) {
+      // Verify it's the player's turn
+      const isWhiteMove = chess.turn() === 'w';
+      const isPlayersTurn = (isWhiteMove && game.players.white === socket.id) || 
+                          (!isWhiteMove && game.players.black === socket.id);
+      
+      if (!isPlayersTurn) {
         socket.emit('error', 'Not your turn');
         return;
       }
 
-      // Get the piece at the target square before the move
-      const targetSquare = chess.get(to);
-
+      // Make the move
       const move = chess.move({ from, to });
       if (!move) {
         socket.emit('error', 'Invalid move');
         return;
       }
 
-      // Initialize captures if they don't exist
-      if (!game.captures) {
-        game.captures = {
-          white: [],
-          black: []
-        };
-      }
-
-      // If there was a capture, add it to the appropriate list
-      if (targetSquare) {
-        const capturedPiece = `${targetSquare.type}_${targetSquare.color}`;
-        if (isWhite) {
-          game.captures.white.push(capturedPiece);
-        } else {
-          game.captures.black.push(capturedPiece);
-        }
-      }
-
-      // Add the move to history
-      if (!game.moveHistory) {
-        game.moveHistory = [];
-      }
-      game.moveHistory.push(move.san);
+      // Update game state
       game.position = chess.fen();
-      
-      // Save updated game state
+      game.moveHistory = chess.history();
+      game.lastActivityTime = Date.now();
+
+      // Check for game end conditions
+      const gameStatus = {
+        isOver: false,
+        type: '',
+        winner: ''
+      };
+
+      if (chess.isCheckmate()) {
+        gameStatus.isOver = true;
+        gameStatus.type = 'checkmate';
+        gameStatus.winner = chess.turn() === 'w' ? 'black' : 'white';
+        game.status = 'completed';
+      } else if (chess.isDraw()) {
+        gameStatus.isOver = true;
+        gameStatus.type = 'draw';
+        game.status = 'completed';
+      }
+
+      // Update clocks if they exist
+      if (game.clock) {
+        const now = Date.now();
+        if (game.clock.lastMoveTime) {
+          const elapsed = now - game.clock.lastMoveTime;
+          if (chess.turn() === 'b') { // White just moved
+            game.clock.white -= elapsed;
+          } else { // Black just moved
+            game.clock.black -= elapsed;
+          }
+        }
+        game.clock.lastMoveTime = now;
+        game.clock.started = true;
+      }
+
+      // Calculate captured pieces
+      const calculateCaptures = () => {
+        const pieces: { [key: string]: number } = {};
+
+        chess.board().forEach(row => {
+          if (!row) return;
+          row.forEach(piece => {
+            if (piece) {
+              const key = `${piece.type}_${piece.color}`;
+              pieces[key] = (pieces[key] || 0) + 1;
+            }
+          });
+        });
+
+        const initialPieces = {
+          p_w: 8, p_b: 8,
+          n_w: 2, n_b: 2,
+          b_w: 2, b_b: 2,
+          r_w: 2, r_b: 2,
+          q_w: 1, q_b: 1
+        } as const;
+
+        const captures = {
+          white: [] as string[],
+          black: [] as string[]
+        };
+
+        Object.entries(initialPieces).forEach(([piece, count]) => {
+          const currentCount = pieces[piece] || 0;
+          const captured = count - currentCount;
+          const [type, color] = piece.split('_');
+          
+          for (let i = 0; i < captured; i++) {
+            if (color === 'w') {
+              captures.black.push(piece);
+            } else {
+              captures.white.push(piece);
+            }
+          }
+        });
+
+        return captures;
+      };
+
+      game.captures = calculateCaptures();
       games.set(gameId, game);
 
-      // Emit move with updated state
+      // Emit move to all players in the game
       io.to(gameId).emit('moveMade', {
-        from,
-        to,
         position: game.position,
         moveHistory: game.moveHistory,
         captures: game.captures,
-        status: game.status
+        clocks: game.clock
       });
 
-      // Check for game over conditions
-      if (chess.isCheckmate()) {
-        const winner = chess.turn() === 'w' ? 'black' : 'white';
-        game.status = 'completed';
-        games.set(gameId, game);
-        io.to(gameId).emit('gameOver', winner);
-      } else if (chess.isDraw()) {
-        game.status = 'completed';
-        games.set(gameId, game);
-        io.to(gameId).emit('gameOver', 'draw');
+      // If game is over, emit game over event
+      if (gameStatus.isOver) {
+        io.to(gameId).emit('game_update', {
+          type: 'game_over',
+          gameStatus
+        });
       }
-      
-      logGameState('After Move');
+
     } catch (error) {
       console.error('Error making move:', error);
       socket.emit('error', 'Failed to make move');
@@ -361,9 +413,9 @@ io.on('connection', (socket) => {
             if (targetSquare) {
               const capturedPiece = `${targetSquare.type}_${targetSquare.color}`;
               if (player === 'white') {
-                game.captures.white.push(capturedPiece);
-              } else {
                 game.captures.black.push(capturedPiece);
+              } else {
+                game.captures.white.push(capturedPiece);
               }
             }
             

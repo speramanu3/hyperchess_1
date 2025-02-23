@@ -1,7 +1,8 @@
 import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Box, 
+  BoxProps, 
   Typography, 
   Paper, 
   styled, 
@@ -18,6 +19,7 @@ import { GameState } from '../types/game';
 import { Chess, PieceSymbol } from 'chess.js';
 import FileCopyIcon from '@mui/icons-material/FileCopy';
 import InfoIcon from '@mui/icons-material/Info';
+import TimerIcon from '@mui/icons-material/Timer';
 
 interface GameRoomProps {
   gameState: GameState;
@@ -158,8 +160,61 @@ const GameStatus = styled('span')({
   marginLeft: 'auto',
 });
 
-export const GameRoom: React.FC<GameRoomProps> = ({ 
-  gameState, 
+interface ClockDisplayProps extends Omit<BoxProps, 'active'> {
+  active?: boolean;
+}
+
+const StyledClockBox = styled(Box, {
+  shouldForwardProp: prop => prop !== 'active'
+})<{ active?: boolean }>(({ theme, active }) => ({
+  padding: '0.5rem 1rem',
+  borderRadius: theme.shape.borderRadius,
+  backgroundColor: active ? theme.palette.primary.main : theme.palette.grey[800],
+  color: active ? theme.palette.primary.contrastText : theme.palette.grey[100],
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  transition: 'all 0.2s ease-in-out',
+  '& .MuiSvgIcon-root': {
+    color: 'inherit'
+  },
+  '& .MuiTypography-root': {
+    color: 'inherit'
+  }
+}));
+
+const ClockDisplay = React.forwardRef<HTMLDivElement, ClockDisplayProps>(
+  ({ active, children, ...props }, ref) => {
+    return (
+      <StyledClockBox ref={ref} active={active} {...props}>
+        {children}
+      </StyledClockBox>
+    );
+  }
+);
+
+ClockDisplay.displayName = 'ClockDisplay';
+
+const ClockContainer = styled(Paper)(({ theme }) => ({
+  padding: '1rem',
+  backgroundColor: theme.palette.grey[900],
+  borderRadius: theme.shape.borderRadius,
+  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  width: '100%',
+  '& > *:not(:last-child)': {
+    marginBottom: '0.5rem'
+  }
+}));
+
+const formatTime = (ms: number) => {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+export const GameRoom: React.FC<GameRoomProps> = ({
+  gameState,
   onMove,
   isWhitePlayer,
   isBlackPlayer,
@@ -194,6 +249,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({
 
   const [moveHistory, setMoveHistory] = React.useState<string[]>([]);
   const [copied, setCopied] = React.useState(false);
+  const [clocks, setClocks] = React.useState<{ white: number; black: number }>({ 
+    white: 5 * 60 * 1000, 
+    black: 5 * 60 * 1000 
+  });
+  const clockInterval = useRef<NodeJS.Timeout | null>(null);
 
   const handleCopyClick = () => {
     navigator.clipboard.writeText(localGameId).then(() => {
@@ -211,37 +271,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     setLocalIsBlackPlayer(isBlackPlayer);
   }, [gameState, isWhitePlayer, isBlackPlayer]);
 
-  // Add socket event listener for move updates
-  React.useEffect(() => {
-    if (socket) {
-      socket.on('moveMade', (data: { 
-        position: string, 
-        moveHistory?: string[],
-        captures?: { white: string[], black: string[] }
-      }) => {
-        console.log('Move made with data:', data);
-        setLocalGameState(prev => ({
-          ...prev,
-          position: data.position,
-          moveHistory: data.moveHistory || [],
-          captures: data.captures || prev.captures
-        }));
-        
-        if (data.moveHistory) {
-          setMoveHistory(data.moveHistory);
-        }
-
-        if (data.captures) {
-          setCapturedPieces(data.captures);
-        }
-      });
-
-      return () => {
-        socket.off('moveMade');
-      };
-    }
-  }, [socket]);
-
   // Add socket event listener for game state updates
   React.useEffect(() => {
     if (socket) {
@@ -249,16 +278,99 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         setLocalGameState(updatedGame);
       });
 
-      socket.on('spectatorsUpdate', (count: number) => {
-        // setSpectatorCount(count);
+      type GameUpdateData = {
+        type: string;
+        gameStatus?: {
+          isOver: boolean;
+          type: 'checkmate' | 'draw';
+          winner?: 'white' | 'black';
+        };
+        player?: 'white' | 'black';
+      };
+
+      socket.on('game_update', (data: GameUpdateData) => {
+        console.log('Received game update:', data);
+        
+        switch (data.type) {
+          case 'game_over':
+            if (data.gameStatus) {
+              setIsGameOver(true);
+              setShowGameOverDialog(true);
+              
+              if (data.gameStatus.type === 'checkmate' && data.gameStatus.winner) {
+                const winner = data.gameStatus.winner === 'white' ? 'White' : 'Black';
+                setGameOverMessage(`Checkmate! ${winner} wins!`);
+              } else if (data.gameStatus.type === 'draw') {
+                setGameOverMessage('Game Over - Draw!');
+              }
+            }
+            break;
+
+          case 'resign':
+            if (data.player) {
+              setIsGameOver(true);
+              setShowGameOverDialog(true);
+              if ((data.player === 'white' && localIsWhitePlayer) || 
+                  (data.player === 'black' && localIsBlackPlayer)) {
+                setGameOverMessage(`You resigned. ${data.player === 'white' ? 'Black' : 'White'} wins!`);
+              } else {
+                setGameOverMessage(`${data.player === 'white' ? 'White' : 'Black'} resigned. You win!`);
+              }
+            }
+            break;
+        }
+      });
+
+      type MoveMadeData = {
+        position: string;
+        moveHistory?: string[];
+        captures?: { white: string[]; black: string[] };
+        clocks?: { white: number; black: number; started: boolean };
+      };
+
+      socket.on('moveMade', (data: MoveMadeData) => {
+        console.log('Move made with data:', data);
+        
+        // Update game state
+        setLocalGameState(prev => ({
+          ...prev,
+          position: data.position,
+          moveHistory: data.moveHistory || prev.moveHistory,
+          captures: data.captures || prev.captures,
+          clock: data.clocks || prev.clock
+        }));
+
+        // Update move history if provided
+        if (data.moveHistory) {
+          setMoveHistory(data.moveHistory);
+        }
+
+        // Update captures if provided
+        if (data.captures) {
+          setCapturedPieces(data.captures);
+        }
+
+        // Check for checkmate or draw
+        const chess = new Chess(data.position);
+        if (chess.isCheckmate() || chess.isDraw()) {
+          setIsGameOver(true);
+          setShowGameOverDialog(true);
+          if (chess.isCheckmate()) {
+            const winner = chess.turn() === 'w' ? 'Black' : 'White';
+            setGameOverMessage(`Checkmate! ${winner} wins!`);
+          } else {
+            setGameOverMessage('Game Over - Draw!');
+          }
+        }
       });
 
       return () => {
         socket.off('gameState');
-        socket.off('spectatorsUpdate');
+        socket.off('game_update');
+        socket.off('moveMade');
       };
     }
-  }, [socket]);
+  }, [socket, localIsWhitePlayer, localIsBlackPlayer]);
 
   // Initialize move history from game state
   React.useEffect(() => {
@@ -338,14 +450,20 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     }
   };
 
-  const getCapturedPieces = () => {
-    const currentPieces: { [key: string]: number } = {};
-    const initialPieces = {
-      p_w: 8, p_b: 8,  // pawns
-      n_w: 2, n_b: 2,  // knights
-      b_w: 2, b_b: 2,  // bishops
-      r_w: 2, r_b: 2,  // rooks
-      q_w: 1, q_b: 1,  // queens
+  // Initialize captured pieces when game starts and when position changes
+  React.useEffect(() => {
+    const chess = new Chess(localGameState.position);
+    const newCapturedPieces = getCapturedPieces(chess);
+    setCapturedPieces(newCapturedPieces);
+  }, [localGameState.position]);
+
+  const getCapturedPieces = (chess: Chess) => {
+    const currentPieces: { [key: string]: number } = {
+      p_w: 0, p_b: 0,  // pawns
+      n_w: 0, n_b: 0,  // knights
+      b_w: 0, b_b: 0,  // bishops
+      r_w: 0, r_b: 0,  // rooks
+      q_w: 0, q_b: 0,  // queens
     };
 
     // Count current pieces
@@ -359,6 +477,15 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       });
     });
 
+    // Initial piece counts
+    const initialPieces = {
+      p_w: 8, p_b: 8,  // pawns
+      n_w: 2, n_b: 2,  // knights
+      b_w: 2, b_b: 2,  // bishops
+      r_w: 2, r_b: 2,  // rooks
+      q_w: 1, q_b: 1,  // queens
+    };
+
     // Calculate captured pieces
     const capturedPieces = {
       white: [] as string[],
@@ -370,7 +497,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       const captured = count - currentCount;
       const [type, color] = piece.split('_');
       
-      for (let i = 0; i <captured; i++) {
+      for (let i = 0; i < captured; i++) {
         if (color === 'w') {
           capturedPieces.black.push(piece);
         } else {
@@ -399,110 +526,49 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     player: 'white' | 'black';
   };
 
-  // Add socket listeners with proper types
+  // Update clocks from game state
   React.useEffect(() => {
-    if (socket) {
-      socket.on('game_update', (data: any) => {
-        console.log('Received game update:', data);
-        
-        switch (data.type) {
-          case 'move':
-            setLocalGameState(prev => ({
-              ...prev,
-              position: data.position
-            }));
-            
-            // Update captured pieces
-            if (data.captures) {
-              setCapturedPieces(data.captures);
-            }
-            
-            // Handle game over conditions
-            if (data.gameStatus) {
-              setIsGameOver(true);
-              setShowGameOverDialog(true);
-              
-              if (data.gameStatus.type === 'checkmate') {
-                const winner = data.gameStatus.winner === 'white' ? 'White' : 'Black';
-                setGameOverMessage(`Checkmate! ${winner} wins!`);
-              } else if (data.gameStatus.type === 'draw') {
-                setGameOverMessage('Game Over - Draw!');
-              }
-            }
-            break;
+    if (localGameState.clock) {
+      setClocks({
+        white: localGameState.clock.white,
+        black: localGameState.clock.black
+      });
+    }
+  }, [localGameState.clock]);
 
-          case 'resign':
-            setIsGameOver(true);
+  // Handle clock ticking
+  React.useEffect(() => {
+    if (localGameState.clock?.started) {
+      const chess = new Chess(localGameState.position);
+      const currentPlayer = chess.turn() === 'w' ? 'white' : 'black';
+      
+      // Clear any existing interval
+      if (clockInterval.current) {
+        clearInterval(clockInterval.current);
+      }
+
+      // Start new interval for current player
+      clockInterval.current = setInterval(() => {
+        setClocks(prev => {
+          const newTime = prev[currentPlayer] - 100; // Decrease by 100ms
+          if (newTime <= 0) {
+            clearInterval(clockInterval.current!);
+            const winner = currentPlayer === 'white' ? 'black' : 'white';
+            setGameOverMessage(`${winner} wins on time`);
             setShowGameOverDialog(true);
-            const resignedPlayer = data.player;
-            if ((resignedPlayer === 'white' && localIsWhitePlayer) || (resignedPlayer === 'black' && localIsBlackPlayer)) {
-              setGameOverMessage(`You resigned. ${resignedPlayer === 'white' ? 'Black' : 'White'} wins!`);
-            } else {
-              setGameOverMessage(`${resignedPlayer === 'white' ? 'White' : 'Black'} resigned. You win!`);
-            }
-            break;
-          
-          case 'rematch_requested':
-            if ((data.player === 'white' && !localIsWhitePlayer) || (data.player === 'black' && !localIsBlackPlayer)) {
-              setShowRematchDialog(true);
-              setGameOverMessage(`${data.player === 'white' ? 'White' : 'Black'} wants a rematch!`);
-            }
-            break;
-
-          case 'rematch_accepted':
-            if (data.game) {
-              const newGame = data.game;
-              console.log('Handling rematch accept. New game:', newGame);
-              
-              // Update the game state and ID
-              setLocalGameState(newGame);
-              setLocalGameId(newGame.gameId);
-              
-              // Update player colors based on the new game
-              const isWhite = newGame.players.white === socket.id;
-              const isBlack = newGame.players.black === socket.id;
-              setLocalIsWhitePlayer(isWhite);
-              setLocalIsBlackPlayer(isBlack);
-              
-              // Reset all game state and dialogs
-              setIsGameOver(false);
-              setShowGameOverDialog(false);
-              setRematchRequested(false);
-              setRematchOffered(false);
-              setShowRematchDialog(false);
-              setGameOverMessage('');
-              
-              console.log('Updated local state:', {
-                gameId: newGame.gameId,
-                isWhite,
-                isBlack,
-                position: newGame.position
-              });
-            }
-            break;
-
-          case 'rematch_declined':
-            setGameOverMessage('Rematch declined. Returning to home...');
-            setTimeout(() => {
-              handleReturnHome();
-            }, 2000);
-            break;
-        }
-      });
-
-      socket.on('opponent_left', () => {
-        setIsGameOver(true);
-        setShowGameOverDialog(true);
-        setGameOverMessage('Opponent has left the game');
-        onLeaveGame?.();
-      });
+            return { ...prev, [currentPlayer]: 0 };
+          }
+          return { ...prev, [currentPlayer]: newTime };
+        });
+      }, 100);
 
       return () => {
-        socket.off('game_update');
-        socket.off('opponent_left');
+        if (clockInterval.current) {
+          clearInterval(clockInterval.current);
+        }
       };
     }
-  }, [socket, onLeaveGame, localIsWhitePlayer, localIsBlackPlayer]);
+  }, [localGameState.clock?.started, localGameState.position]);
 
   // Render move history
   const renderMoveHistory = () => {
@@ -570,54 +636,44 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       </GameHeader>
 
       {/* Game Content */}
-      <Box sx={{ 
-        display: 'flex', 
-        gap: '2rem', 
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        flexWrap: 'wrap'
-      }}>
-        {/* Left Side - Captured Pieces and Move History */}
-        <Box>
-          <Paper 
-            elevation={3}
-            sx={{
-              p: 2,
-              bgcolor: 'background.paper',
-              minWidth: 200,
-              minHeight: 100
-            }}
-          >
-            <Box>
-              <Typography variant="subtitle1">Black's Captures:</Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                {capturedPieces.black.map((piece, index) => {
-                  const [type, color] = piece.split('_');
-                  return (
-                    <Typography key={index} variant="body1" sx={{ fontSize: '2rem' }}>
-                      {type === 'p' ? '♟' :
-                       type === 'n' ? '♞' :
-                       type === 'b' ? '♝' :
-                       type === 'r' ? '♜' :
-                       type === 'q' ? '♛' : ''}
+      <GameContainer>
+        {/* Left Side - Captured Pieces & Move History */}
+        <Box sx={{ minWidth: '200px' }}>
+          {/* Captured Pieces */}
+          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>Captured Pieces</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box>
+                <Typography variant="body2" sx={{ mb: 1 }}>White captured:</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, minHeight: '32px' }}>
+                  {capturedPieces.white.map((piece, index) => (
+                    <Typography key={index} variant="body1" sx={{ fontSize: '24px', color: '#000' }}>
+                      {piece.includes('_b') ? (
+                        piece === 'p_b' ? '♟' :
+                        piece === 'n_b' ? '♞' :
+                        piece === 'b_b' ? '♝' :
+                        piece === 'r_b' ? '♜' :
+                        piece === 'q_b' ? '♛' : ''
+                      ) : ''}
                     </Typography>
-                  );
-                })}
+                  ))}
+                </Box>
               </Box>
-              <Typography variant="subtitle1">White's Captures:</Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {capturedPieces.white.map((piece, index) => {
-                  const [type, color] = piece.split('_');
-                  return (
-                    <Typography key={index} variant="body1" sx={{ fontSize: '2rem' }}>
-                      {type === 'p' ? '♙' :
-                       type === 'n' ? '♘' :
-                       type === 'b' ? '♗' :
-                       type === 'r' ? '♖' :
-                       type === 'q' ? '♕' : ''}
+              <Box>
+                <Typography variant="body2" sx={{ mb: 1 }}>Black captured:</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, minHeight: '32px' }}>
+                  {capturedPieces.black.map((piece, index) => (
+                    <Typography key={index} variant="body1" sx={{ fontSize: '24px', color: '#fff' }}>
+                      {piece.includes('_w') ? (
+                        piece === 'p_w' ? '♙' :
+                        piece === 'n_w' ? '♘' :
+                        piece === 'b_w' ? '♗' :
+                        piece === 'r_w' ? '♖' :
+                        piece === 'q_w' ? '♕' : ''
+                      ) : ''}
                     </Typography>
-                  );
-                })}
+                  ))}
+                </Box>
               </Box>
             </Box>
           </Paper>
@@ -642,68 +698,99 @@ export const GameRoom: React.FC<GameRoomProps> = ({
 
         {/* Center - Chess Board */}
         <Box>
-          <ChessBoard
-            fen={localGameState.position}
-            onMove={handleMove}
-            isWhitePlayer={localIsWhitePlayer}
-            isBlackPlayer={localIsBlackPlayer}
-          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Top Clock */}
+            <ClockContainer>
+              <ClockDisplay active={localIsWhitePlayer ? !isWhitePlayer && localGameState.clock?.started : isWhitePlayer && localGameState.clock?.started}>
+                <TimerIcon />
+                <Typography variant="h6">
+                  {localIsWhitePlayer ? 'Black' : 'White'}: {formatTime(localIsWhitePlayer ? clocks.black : clocks.white)}
+                </Typography>
+              </ClockDisplay>
+            </ClockContainer>
 
-          <Typography 
-            variant="body2" 
-            sx={{
-              mt: 2,
-              textAlign: 'center',
-              fontStyle: 'italic'
-            }}
-          >
-            Playing as: {localIsWhitePlayer ? 'White' : localIsBlackPlayer ? 'Black' : 'Spectator'}
-          </Typography>
+            <ChessBoard
+              fen={localGameState.position}
+              onMove={handleMove}
+              isWhitePlayer={localIsWhitePlayer}
+              isBlackPlayer={localIsBlackPlayer}
+            />
+
+            {/* Bottom Clock */}
+            <ClockContainer>
+              <ClockDisplay active={localIsWhitePlayer ? isWhitePlayer && localGameState.clock?.started : !isWhitePlayer && localGameState.clock?.started}>
+                <TimerIcon />
+                <Typography variant="h6">
+                  {localIsWhitePlayer ? 'White' : 'Black'}: {formatTime(localIsWhitePlayer ? clocks.white : clocks.black)}
+                </Typography>
+              </ClockDisplay>
+            </ClockContainer>
+
+            <Typography 
+              variant="body2" 
+              sx={{
+                textAlign: 'center',
+                fontStyle: 'italic'
+              }}
+            >
+              Playing as: {localIsWhitePlayer ? 'White' : localIsBlackPlayer ? 'Black' : 'Spectator'}
+            </Typography>
+          </Box>
         </Box>
 
         {/* Right Side - Game Controls */}
-        <Box sx={{ minWidth: '180px' }}>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => onLeaveGame?.()}
-            fullWidth
-            sx={{
-              textTransform: 'none',
-              mb: 2,
-              '&:hover': {
-                backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                borderColor: 'error.main',
-                color: 'error.main'
-              }
-            }}
-          >
-            leave game
-          </Button>
-          {(localIsWhitePlayer || localIsBlackPlayer) && localGameState.status === 'active' && (
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={handleResign}
-              fullWidth
-              sx={{
-                textTransform: 'none',
-                mb: 2,
-                borderColor: 'error.main',
-                color: 'error.main',
-                '&:hover': {
-                  backgroundColor: 'error.main',
-                  color: 'white'
-                }
-              }}
-            >
-              resign
-            </Button>
+        <Box sx={{ 
+          minWidth: '180px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2
+        }}>
+          {/* Game Controls */}
+          {(localIsWhitePlayer || localIsBlackPlayer) && (
+            <Paper elevation={3} sx={{ p: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 2 }}>Game Controls</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => onLeaveGame?.()}
+                  fullWidth
+                  sx={{
+                    textTransform: 'none',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                      borderColor: 'error.main',
+                      color: 'error.main'
+                    }
+                  }}
+                >
+                  Leave Game
+                </Button>
+                {localGameState.status === 'active' && (
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={handleResign}
+                    fullWidth
+                    sx={{
+                      textTransform: 'none',
+                      borderColor: 'error.main',
+                      color: 'error.main',
+                      '&:hover': {
+                        backgroundColor: 'rgba(255, 0, 0, 0.1)'
+                      }
+                    }}
+                  >
+                    Resign
+                  </Button>
+                )}
+              </Box>
+            </Paper>
           )}
         </Box>
-      </Box>
+      </GameContainer>
 
-      {/* Game Over Dialog */}
+      {/* Dialogs */}
       <Dialog 
         open={showGameOverDialog} 
         onClose={() => setShowGameOverDialog(false)}
@@ -758,7 +845,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         </DialogActions>
       </Dialog>
 
-      {/* Rematch Dialog */}
       <Dialog
         open={showRematchDialog}
         onClose={() => setShowRematchDialog(false)}
