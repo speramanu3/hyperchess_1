@@ -1,10 +1,23 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
-import { Box, Typography, Paper, styled, Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton, Tooltip } from '@mui/material';
+import { 
+  Box, 
+  Typography, 
+  Paper, 
+  styled, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogActions, 
+  Button, 
+  IconButton, 
+  Tooltip 
+} from '@mui/material';
 import { ChessBoard } from './Board/ChessBoard';
 import { GameState } from '../types/game';
 import { Chess, PieceSymbol } from 'chess.js';
 import FileCopyIcon from '@mui/icons-material/FileCopy';
+import InfoIcon from '@mui/icons-material/Info';
 
 interface GameRoomProps {
   gameState: GameState;
@@ -44,6 +57,42 @@ const CapturedPiece = styled('img')({
   width: '30px',
   height: '30px',
   objectFit: 'contain',
+});
+
+const MoveHistoryContainer = styled(Paper)(({ theme }) => ({
+  padding: '1rem',
+  minWidth: '200px',
+  minHeight: '100px',
+  backgroundColor: theme.palette.background.paper,
+  marginTop: '1rem',
+  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+  borderRadius: '8px'
+}));
+
+const MoveEntry = styled(Box)({
+  display: 'grid',
+  gridTemplateColumns: '30px 85px 85px',
+  padding: '4px 8px',
+  fontSize: '14px',
+  '&:nth-of-type(odd)': {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  '&:hover': {
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  }
+});
+
+const MoveNumber = styled('span')({
+  textAlign: 'right',
+  paddingRight: '8px',
+  fontWeight: 'bold'
+});
+
+const MoveText = styled('span')({
+  textAlign: 'left',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
 });
 
 const getPieceValue = (piece: PieceSymbol): number => {
@@ -143,6 +192,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     black: []
   });
 
+  const [moveHistory, setMoveHistory] = React.useState<string[]>([]);
   const [copied, setCopied] = React.useState(false);
 
   const handleCopyClick = () => {
@@ -160,6 +210,84 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     setLocalIsWhitePlayer(isWhitePlayer);
     setLocalIsBlackPlayer(isBlackPlayer);
   }, [gameState, isWhitePlayer, isBlackPlayer]);
+
+  // Add socket event listener for move updates
+  React.useEffect(() => {
+    if (socket) {
+      socket.on('moveMade', (data: { 
+        position: string, 
+        moveHistory?: string[],
+        captures?: { white: string[], black: string[] }
+      }) => {
+        console.log('Move made with data:', data);
+        setLocalGameState(prev => ({
+          ...prev,
+          position: data.position,
+          moveHistory: data.moveHistory || [],
+          captures: data.captures || prev.captures
+        }));
+        
+        if (data.moveHistory) {
+          setMoveHistory(data.moveHistory);
+        }
+
+        if (data.captures) {
+          setCapturedPieces(data.captures);
+        }
+      });
+
+      return () => {
+        socket.off('moveMade');
+      };
+    }
+  }, [socket]);
+
+  // Add socket event listener for game state updates
+  React.useEffect(() => {
+    if (socket) {
+      socket.on('gameState', (updatedGame: GameState) => {
+        setLocalGameState(updatedGame);
+      });
+
+      socket.on('spectatorsUpdate', (count: number) => {
+        // setSpectatorCount(count);
+      });
+
+      return () => {
+        socket.off('gameState');
+        socket.off('spectatorsUpdate');
+      };
+    }
+  }, [socket]);
+
+  // Initialize move history from game state
+  React.useEffect(() => {
+    console.log('Game state updated:', localGameState);
+    if (localGameState.moveHistory && localGameState.moveHistory.length > 0) {
+      console.log('Setting move history from game state:', localGameState.moveHistory);
+      setMoveHistory(localGameState.moveHistory);
+    } else {
+      try {
+        // Fallback to calculating moves if server doesn't provide them
+        const newChess = new Chess(localGameState.position);
+        const moves = newChess.history();
+        console.log('Calculated move history:', moves);
+        setMoveHistory(moves);
+      } catch (error) {
+        console.error('Error updating move history:', error);
+      }
+    }
+  }, [localGameState]);
+
+  const handleMove = React.useCallback((move: { from: string; to: string }) => {
+    if (socket) {
+      socket.emit('makeMove', {
+        gameId: localGameId,
+        from: move.from,
+        to: move.to
+      });
+    }
+  }, [socket, localGameId]);
 
   const handleRematchRequest = () => {
     if (socket) {
@@ -256,18 +384,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     capturedPieces.black.sort((a, b) => getPieceValue(b.split('_')[0] as PieceSymbol) - getPieceValue(a.split('_')[0] as PieceSymbol));
 
     return capturedPieces;
-  };
-
-  const handleMove = (move: { from: string; to: string }) => {
-    console.log('Attempting move:', move, 'in game:', localGameId);
-    if (socket) {
-      socket.emit('game_action', {
-        type: 'move',
-        gameId: localGameId,
-        move,
-        player: localIsWhitePlayer ? 'white' : 'black'
-      });
-    }
   };
 
   // Add socket event types
@@ -388,6 +504,26 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     }
   }, [socket, onLeaveGame, localIsWhitePlayer, localIsBlackPlayer]);
 
+  // Render move history
+  const renderMoveHistory = () => {
+    // Group moves by turn number
+    const turns: { white: string; black?: string }[] = [];
+    for (let i = 0; i < moveHistory.length; i += 2) {
+      turns.push({
+        white: moveHistory[i],
+        black: moveHistory[i + 1]
+      });
+    }
+
+    return turns.map((turn, index) => (
+      <MoveEntry key={index}>
+        <MoveNumber>{index + 1}.</MoveNumber>
+        <MoveText>{turn.white}</MoveText>
+        <MoveText>{turn.black || ''}</MoveText>
+      </MoveEntry>
+    ));
+  };
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', p: 4 }}>
       {/* Title */}
@@ -441,43 +577,68 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         alignItems: 'flex-start',
         flexWrap: 'wrap'
       }}>
-        {/* Left Side - Captured Pieces */}
-        <Paper 
-          elevation={3}
-          sx={{
-            p: 2,
-            bgcolor: 'background.paper',
-            minWidth: 200,
-            minHeight: 100
-          }}
-        >
-          <Box>
-            <Typography variant="subtitle1">Black's Captures:</Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-              {capturedPieces.black.map((piece, index) => (
-                <Typography key={index} variant="body1" sx={{ fontSize: '2rem' }}>
-                  {piece === 'P' ? '♟' :
-                   piece === 'N' ? '♞' :
-                   piece === 'B' ? '♝' :
-                   piece === 'R' ? '♜' :
-                   piece === 'Q' ? '♛' : ''}
-                </Typography>
-              ))}
+        {/* Left Side - Captured Pieces and Move History */}
+        <Box>
+          <Paper 
+            elevation={3}
+            sx={{
+              p: 2,
+              bgcolor: 'background.paper',
+              minWidth: 200,
+              minHeight: 100
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle1">Black's Captures:</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                {capturedPieces.black.map((piece, index) => {
+                  const [type, color] = piece.split('_');
+                  return (
+                    <Typography key={index} variant="body1" sx={{ fontSize: '2rem' }}>
+                      {type === 'p' ? '♟' :
+                       type === 'n' ? '♞' :
+                       type === 'b' ? '♝' :
+                       type === 'r' ? '♜' :
+                       type === 'q' ? '♛' : ''}
+                    </Typography>
+                  );
+                })}
+              </Box>
+              <Typography variant="subtitle1">White's Captures:</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {capturedPieces.white.map((piece, index) => {
+                  const [type, color] = piece.split('_');
+                  return (
+                    <Typography key={index} variant="body1" sx={{ fontSize: '2rem' }}>
+                      {type === 'p' ? '♙' :
+                       type === 'n' ? '♘' :
+                       type === 'b' ? '♗' :
+                       type === 'r' ? '♖' :
+                       type === 'q' ? '♕' : ''}
+                    </Typography>
+                  );
+                })}
+              </Box>
             </Box>
-            <Typography variant="subtitle1">White's Captures:</Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {capturedPieces.white.map((piece, index) => (
-                <Typography key={index} variant="body1" sx={{ fontSize: '2rem' }}>
-                  {piece === 'P' ? '♙' :
-                   piece === 'N' ? '♘' :
-                   piece === 'B' ? '♗' :
-                   piece === 'R' ? '♖' :
-                   piece === 'Q' ? '♕' : ''}
+          </Paper>
+
+          {/* Move History */}
+          <MoveHistoryContainer elevation={3}>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>Move History</Typography>
+            <Box sx={{ 
+              maxHeight: '200px', 
+              overflowY: 'auto'
+            }}>
+              {moveHistory.length > 0 ? (
+                renderMoveHistory()
+              ) : (
+                <Typography variant="body2" sx={{ color: 'text.secondary', p: 1 }}>
+                  No moves yet
                 </Typography>
-              ))}
+              )}
             </Box>
-          </Box>
-        </Paper>
+          </MoveHistoryContainer>
+        </Box>
 
         {/* Center - Chess Board */}
         <Box>
@@ -487,6 +648,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             isWhitePlayer={localIsWhitePlayer}
             isBlackPlayer={localIsBlackPlayer}
           />
+
           <Typography 
             variant="body2" 
             sx={{

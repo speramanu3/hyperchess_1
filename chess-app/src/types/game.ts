@@ -6,6 +6,11 @@ export interface GameState {
     white: string | null;
     black: string | null;
   };
+  captures?: {
+    white: string[];
+    black: string[];
+  };
+  moveHistory?: string[];
 }
 
 export interface GameMove {
@@ -13,4 +18,5 @@ export interface GameMove {
   to: string;
   position: string;
   status: GameState['status'];
+  moveHistory?: string[];
 }
