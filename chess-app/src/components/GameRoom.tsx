@@ -1,25 +1,24 @@
-import React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { styled } from '@mui/material/styles';
 import { 
   Box, 
-  BoxProps, 
-  Typography, 
-  Paper, 
-  styled, 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
   Button, 
-  IconButton, 
-  Tooltip 
+  Dialog, 
+  DialogActions, 
+  DialogContent, 
+  DialogTitle, 
+  IconButton,
+  Paper, 
+  Tooltip,
+  Typography,
+  BoxProps
 } from '@mui/material';
-import { ChessBoard } from './Board/ChessBoard';
-import { GameState } from '../types/game';
-import { Chess, PieceSymbol } from 'chess.js';
-import FileCopyIcon from '@mui/icons-material/FileCopy';
-import InfoIcon from '@mui/icons-material/Info';
 import TimerIcon from '@mui/icons-material/Timer';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import React, { useEffect, useRef, useState } from 'react';
+import { Chess } from 'chess.js';
+import { ChessBoard } from './Board/ChessBoard';
+import { useSocket } from '../hooks/useSocket';
+import { GameState } from '../types/game';
 
 interface GameRoomProps {
   gameState: GameState;
@@ -30,13 +29,68 @@ interface GameRoomProps {
   onLeaveGame?: () => void; // Optional callback for leaving the game
 }
 
-const GameContainer = styled(Box)({
+interface ClockUpdate {
+  white: number;
+  black: number;
+  lastMoveTime?: number;
+  started: boolean;
+  paused?: boolean;
+}
+
+interface GameUpdateData {
+  type: string;
+  gameStatus?: {
+    isOver: boolean;
+    type: 'checkmate' | 'draw' | 'timeout';
+    winner?: 'white' | 'black';
+  };
+  player?: 'white' | 'black';
+}
+
+interface MoveMadeData {
+  position: string;
+  moveHistory?: string[];
+  captures?: { white: string[]; black: string[] };
+  clocks?: ClockUpdate;
+}
+
+const GameRoomContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  padding: '20px'
+}));
+
+const ClockContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  justifyContent: 'space-between',
+  width: '100%',
+  maxWidth: '600px',
+  margin: '20px 0',
+
+  '& .clock': {
+    padding: '10px 20px',
+    borderRadius: '5px',
+    backgroundColor: theme.palette.grey[100],
+    fontSize: '24px',
+    fontWeight: 'bold',
+    minWidth: '120px',
+    textAlign: 'center',
+    
+    '&.active': {
+      backgroundColor: theme.palette.success.main,
+      color: theme.palette.success.contrastText
+    }
+  }
+}));
+
+const GameContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   gap: '2rem',
   alignItems: 'flex-start',
   justifyContent: 'center',
   padding: '2rem',
-});
+}));
 
 const CapturedPiecesContainer = styled(Paper)(({ theme }) => ({
   padding: '1rem',
@@ -48,18 +102,18 @@ const CapturedPiecesContainer = styled(Paper)(({ theme }) => ({
   gap: '1rem',
 }));
 
-const PiecesSection = styled(Box)({
+const PiecesSection = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexWrap: 'wrap',
   gap: '0.5rem',
   justifyContent: 'center'
-});
+}));
 
-const CapturedPiece = styled('img')({
+const CapturedPiece = styled('img')(({ theme }) => ({
   width: '30px',
   height: '30px',
   objectFit: 'contain',
-});
+}));
 
 const MoveHistoryContainer = styled(Paper)(({ theme }) => ({
   padding: '1rem',
@@ -71,7 +125,7 @@ const MoveHistoryContainer = styled(Paper)(({ theme }) => ({
   borderRadius: '8px'
 }));
 
-const MoveEntry = styled(Box)({
+const MoveEntry = styled(Box)(({ theme }) => ({
   display: 'grid',
   gridTemplateColumns: '30px 85px 85px',
   padding: '4px 8px',
@@ -82,22 +136,60 @@ const MoveEntry = styled(Box)({
   '&:hover': {
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
   }
-});
+}));
 
-const MoveNumber = styled('span')({
+const MoveNumber = styled('span')(({ theme }) => ({
   textAlign: 'right',
   paddingRight: '8px',
   fontWeight: 'bold'
-});
+}));
 
-const MoveText = styled('span')({
+const MoveText = styled('span')(({ theme }) => ({
   textAlign: 'left',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap'
-});
+}));
 
-const getPieceValue = (piece: PieceSymbol): number => {
+interface ClockDisplayProps extends BoxProps {
+  active?: boolean;
+}
+
+const ClockDisplay = styled(Box, {
+  shouldForwardProp: prop => prop !== 'active'
+})<ClockDisplayProps>(({ theme, active }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '8px 16px',
+  borderRadius: '4px',
+  backgroundColor: active ? theme.palette.success.main : theme.palette.grey[800],
+  color: active ? theme.palette.success.contrastText : theme.palette.grey[100],
+  transition: 'background-color 0.3s ease'
+}));
+
+const GameHeader = styled('div')(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '12px',
+  backgroundColor: '#2c2c2c',
+  borderRadius: '4px',
+  marginBottom: '20px',
+}));
+
+const GameId = styled('span')(({ theme }) => ({
+  color: '#86c1b9',
+  fontFamily: 'monospace',
+  fontSize: '14px',
+}));
+
+const GameStatus = styled('span')(({ theme }) => ({
+  color: '#86c1b9',
+  marginLeft: 'auto',
+}));
+
+const getPieceValue = (piece: string): number => {
   switch (piece) {
     case 'q': return 9;
     case 'r': return 5;
@@ -138,73 +230,6 @@ const getPieceName = (piece: string): string => {
   }
   return `${colorName} ${pieceName}`;
 };
-
-const GameHeader = styled('div')({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  padding: '12px',
-  backgroundColor: '#2c2c2c',
-  borderRadius: '4px',
-  marginBottom: '20px',
-});
-
-const GameId = styled('span')({
-  color: '#86c1b9',
-  fontFamily: 'monospace',
-  fontSize: '14px',
-});
-
-const GameStatus = styled('span')({
-  color: '#86c1b9',
-  marginLeft: 'auto',
-});
-
-interface ClockDisplayProps extends Omit<BoxProps, 'active'> {
-  active?: boolean;
-}
-
-const StyledClockBox = styled(Box, {
-  shouldForwardProp: prop => prop !== 'active'
-})<{ active?: boolean }>(({ theme, active }) => ({
-  padding: '0.5rem 1rem',
-  borderRadius: theme.shape.borderRadius,
-  backgroundColor: active ? theme.palette.primary.main : theme.palette.grey[800],
-  color: active ? theme.palette.primary.contrastText : theme.palette.grey[100],
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  transition: 'all 0.2s ease-in-out',
-  '& .MuiSvgIcon-root': {
-    color: 'inherit'
-  },
-  '& .MuiTypography-root': {
-    color: 'inherit'
-  }
-}));
-
-const ClockDisplay = React.forwardRef<HTMLDivElement, ClockDisplayProps>(
-  ({ active, children, ...props }, ref) => {
-    return (
-      <StyledClockBox ref={ref} active={active} {...props}>
-        {children}
-      </StyledClockBox>
-    );
-  }
-);
-
-ClockDisplay.displayName = 'ClockDisplay';
-
-const ClockContainer = styled(Paper)(({ theme }) => ({
-  padding: '1rem',
-  backgroundColor: theme.palette.grey[900],
-  borderRadius: theme.shape.borderRadius,
-  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-  width: '100%',
-  '& > *:not(:last-child)': {
-    marginBottom: '0.5rem'
-  }
-}));
 
 const formatTime = (ms: number) => {
   const totalSeconds = Math.ceil(ms / 1000);
@@ -249,11 +274,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({
 
   const [moveHistory, setMoveHistory] = React.useState<string[]>([]);
   const [copied, setCopied] = React.useState(false);
-  const [clocks, setClocks] = React.useState<{ white: number; black: number }>({ 
-    white: 5 * 60 * 1000, 
-    black: 5 * 60 * 1000 
+  const [clockState, setClockState] = React.useState<ClockUpdate>({
+    white: 5 * 60 * 1000, // 5 minutes in milliseconds
+    black: 5 * 60 * 1000,
+    started: false
   });
-  const clockInterval = useRef<NodeJS.Timeout | null>(null);
 
   const handleCopyClick = () => {
     navigator.clipboard.writeText(localGameId).then(() => {
@@ -278,16 +303,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         setLocalGameState(updatedGame);
       });
 
-      type GameUpdateData = {
-        type: string;
-        gameStatus?: {
-          isOver: boolean;
-          type: 'checkmate' | 'draw';
-          winner?: 'white' | 'black';
-        };
-        player?: 'white' | 'black';
-      };
-
       socket.on('game_update', (data: GameUpdateData) => {
         console.log('Received game update:', data);
         
@@ -302,6 +317,8 @@ export const GameRoom: React.FC<GameRoomProps> = ({
                 setGameOverMessage(`Checkmate! ${winner} wins!`);
               } else if (data.gameStatus.type === 'draw') {
                 setGameOverMessage('Game Over - Draw!');
+              } else if (data.gameStatus.type === 'timeout') {
+                setGameOverMessage('Game Over - Time\'s up!');
               }
             }
             break;
@@ -321,12 +338,9 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         }
       });
 
-      type MoveMadeData = {
-        position: string;
-        moveHistory?: string[];
-        captures?: { white: string[]; black: string[] };
-        clocks?: { white: number; black: number; started: boolean };
-      };
+      socket.on('clockUpdate', (updatedClock: ClockUpdate) => {
+        setClockState(updatedClock);
+      });
 
       socket.on('moveMade', (data: MoveMadeData) => {
         console.log('Move made with data:', data);
@@ -368,6 +382,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         socket.off('gameState');
         socket.off('game_update');
         socket.off('moveMade');
+        socket.off('clockUpdate');
       };
     }
   }, [socket, localIsWhitePlayer, localIsBlackPlayer]);
@@ -507,8 +522,8 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     });
 
     // Sort by piece value
-    capturedPieces.white.sort((a, b) => getPieceValue(b.split('_')[0] as PieceSymbol) - getPieceValue(a.split('_')[0] as PieceSymbol));
-    capturedPieces.black.sort((a, b) => getPieceValue(b.split('_')[0] as PieceSymbol) - getPieceValue(a.split('_')[0] as PieceSymbol));
+    capturedPieces.white.sort((a, b) => getPieceValue(b.split('_')[0] as string) - getPieceValue(a.split('_')[0] as string));
+    capturedPieces.black.sort((a, b) => getPieceValue(b.split('_')[0] as string) - getPieceValue(a.split('_')[0] as string));
 
     return capturedPieces;
   };
@@ -526,49 +541,30 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     player: 'white' | 'black';
   };
 
-  // Update clocks from game state
-  React.useEffect(() => {
-    if (localGameState.clock) {
-      setClocks({
-        white: localGameState.clock.white,
-        black: localGameState.clock.black
-      });
-    }
-  }, [localGameState.clock]);
+  // Format time for display
+  const formatTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
 
-  // Handle clock ticking
-  React.useEffect(() => {
-    if (localGameState.clock?.started) {
-      const chess = new Chess(localGameState.position);
-      const currentPlayer = chess.turn() === 'w' ? 'white' : 'black';
-      
-      // Clear any existing interval
-      if (clockInterval.current) {
-        clearInterval(clockInterval.current);
-      }
-
-      // Start new interval for current player
-      clockInterval.current = setInterval(() => {
-        setClocks(prev => {
-          const newTime = prev[currentPlayer] - 100; // Decrease by 100ms
-          if (newTime <= 0) {
-            clearInterval(clockInterval.current!);
-            const winner = currentPlayer === 'white' ? 'black' : 'white';
-            setGameOverMessage(`${winner} wins on time`);
-            setShowGameOverDialog(true);
-            return { ...prev, [currentPlayer]: 0 };
-          }
-          return { ...prev, [currentPlayer]: newTime };
-        });
-      }, 100);
-
-      return () => {
-        if (clockInterval.current) {
-          clearInterval(clockInterval.current);
-        }
-      };
-    }
-  }, [localGameState.clock?.started, localGameState.position]);
+  // Render clocks
+  const renderClocks = () => {
+    const currentPlayer = localGameState?.position ? new Chess(localGameState.position).turn() : 'w';
+    const isWhiteTurn = currentPlayer === 'w';
+    
+    return (
+      <ClockContainer>
+        <div className={`clock ${isWhiteTurn ? 'active' : ''}`}>
+          White: {formatTime(clockState.white)}
+        </div>
+        <div className={`clock ${!isWhiteTurn ? 'active' : ''}`}>
+          Black: {formatTime(clockState.black)}
+        </div>
+      </ClockContainer>
+    );
+  };
 
   // Render move history
   const renderMoveHistory = () => {
@@ -590,294 +586,180 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     ));
   };
 
+  const renderCapturedPieces = () => {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <Box>
+          <Typography variant="body2" sx={{ mb: 1 }}>White captured:</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, minHeight: '32px' }}>
+            {capturedPieces.white.map((piece, index) => (
+              <Typography key={index} variant="body1" sx={{ fontSize: '24px', color: '#000' }}>
+                {piece.includes('_b') ? (
+                  piece === 'p_b' ? '♟' :
+                  piece === 'n_b' ? '♞' :
+                  piece === 'b_b' ? '♝' :
+                  piece === 'r_b' ? '♜' :
+                  piece === 'q_b' ? '♛' : ''
+                ) : ''}
+              </Typography>
+            ))}
+          </Box>
+        </Box>
+        <Box>
+          <Typography variant="body2" sx={{ mb: 1 }}>Black captured:</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, minHeight: '32px' }}>
+            {capturedPieces.black.map((piece, index) => (
+              <Typography key={index} variant="body1" sx={{ fontSize: '24px', color: '#fff' }}>
+                {piece.includes('_w') ? (
+                  piece === 'p_w' ? '♙' :
+                  piece === 'n_w' ? '♘' :
+                  piece === 'b_w' ? '♗' :
+                  piece === 'r_w' ? '♖' :
+                  piece === 'q_w' ? '♕' : ''
+                ) : ''}
+              </Typography>
+            ))}
+          </Box>
+        </Box>
+      </Box>
+    );
+  };
+
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', p: 4 }}>
+    <GameRoomContainer>
       {/* Title */}
       <Typography
         variant="h1"
-        component="h1"
-        align="center"
-        gutterBottom
         sx={{
-          mb: 4,
-          fontWeight: 'bold',
-          background: 'linear-gradient(45deg, #60EFFF 30%, #00FF87 90%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '0 2px 8px rgba(96, 239, 255, 0.3)',
-          filter: 'drop-shadow(0 2px 8px rgba(96, 239, 255, 0.3))',
-          fontSize: '2.5rem',
-          letterSpacing: '0.05em',
-          textTransform: 'lowercase'
+          fontSize: '2rem',
+          marginBottom: '2rem',
+          color: 'text.primary'
         }}
       >
-        hyperchess
+        Chess Game
       </Typography>
 
-      {/* Game Info */}
-      <GameHeader>
-        <span style={{ color: '#fff' }}>Game ID:</span>
-        <GameId>{localGameId}</GameId>
-        <Tooltip title={copied ? "Copied!" : "Copy game ID"}>
-          <IconButton 
-            onClick={handleCopyClick}
+      {/* Game Header */}
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '8px',
+        width: '100%',
+        maxWidth: '800px',
+        marginBottom: '20px'
+      }}>
+        <Typography variant="subtitle1" sx={{ color: 'text.secondary' }}>
+          Game ID:
+        </Typography>
+        <Typography
+          sx={{
+            color: '#86c1b9',
+            fontFamily: 'monospace',
+            fontSize: '14px'
+          }}
+        >
+          {localGameId}
+        </Typography>
+        <Tooltip title={copied ? 'Copied!' : 'Copy game ID'}>
+          <IconButton
             size="small"
-            sx={{ 
-              color: copied ? '#4CAF50' : '#86c1b9',
-              '&:hover': { 
-                color: copied ? '#4CAF50' : '#aaf0e6' 
-              }
-            }}
+            onClick={handleCopyClick}
+            sx={{ ml: 1 }}
           >
-            <FileCopyIcon fontSize="small" />
+            <ContentCopyIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-        <GameStatus>Status: {localGameState.status}</GameStatus>
-      </GameHeader>
+        <Typography sx={{ 
+          marginLeft: 'auto',
+          color: '#86c1b9' 
+        }}>
+          Status: {localGameState.status}
+        </Typography>
+      </Box>
 
-      {/* Game Content */}
-      <GameContainer>
-        {/* Left Side - Captured Pieces & Move History */}
-        <Box sx={{ minWidth: '200px' }}>
-          {/* Captured Pieces */}
-          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>Captured Pieces</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box>
-                <Typography variant="body2" sx={{ mb: 1 }}>White captured:</Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, minHeight: '32px' }}>
-                  {capturedPieces.white.map((piece, index) => (
-                    <Typography key={index} variant="body1" sx={{ fontSize: '24px', color: '#000' }}>
-                      {piece.includes('_b') ? (
-                        piece === 'p_b' ? '♟' :
-                        piece === 'n_b' ? '♞' :
-                        piece === 'b_b' ? '♝' :
-                        piece === 'r_b' ? '♜' :
-                        piece === 'q_b' ? '♛' : ''
-                      ) : ''}
-                    </Typography>
-                  ))}
-                </Box>
-              </Box>
-              <Box>
-                <Typography variant="body2" sx={{ mb: 1 }}>Black captured:</Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, minHeight: '32px' }}>
-                  {capturedPieces.black.map((piece, index) => (
-                    <Typography key={index} variant="body1" sx={{ fontSize: '24px', color: '#fff' }}>
-                      {piece.includes('_w') ? (
-                        piece === 'p_w' ? '♙' :
-                        piece === 'n_w' ? '♘' :
-                        piece === 'b_w' ? '♗' :
-                        piece === 'r_w' ? '♖' :
-                        piece === 'q_w' ? '♕' : ''
-                      ) : ''}
-                    </Typography>
-                  ))}
-                </Box>
-              </Box>
-            </Box>
-          </Paper>
-
-          {/* Move History */}
-          <MoveHistoryContainer elevation={3}>
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>Move History</Typography>
-            <Box sx={{ 
-              maxHeight: '200px', 
-              overflowY: 'auto'
-            }}>
-              {moveHistory.length > 0 ? (
-                renderMoveHistory()
-              ) : (
-                <Typography variant="body2" sx={{ color: 'text.secondary', p: 1 }}>
-                  No moves yet
-                </Typography>
-              )}
-            </Box>
-          </MoveHistoryContainer>
-        </Box>
-
-        {/* Center - Chess Board */}
+      <Box sx={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Game Area */}
         <Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Top Clock */}
-            <ClockContainer>
-              <ClockDisplay active={localIsWhitePlayer ? !isWhitePlayer && localGameState.clock?.started : isWhitePlayer && localGameState.clock?.started}>
-                <TimerIcon />
-                <Typography variant="h6">
-                  {localIsWhitePlayer ? 'Black' : 'White'}: {formatTime(localIsWhitePlayer ? clocks.black : clocks.white)}
-                </Typography>
-              </ClockDisplay>
-            </ClockContainer>
+            {renderClocks()}
 
             <ChessBoard
               fen={localGameState.position}
               onMove={handleMove}
-              isWhitePlayer={localIsWhitePlayer}
-              isBlackPlayer={localIsBlackPlayer}
+              orientation={localIsWhitePlayer ? 'white' : 'black'}
             />
 
             {/* Bottom Clock */}
-            <ClockContainer>
-              <ClockDisplay active={localIsWhitePlayer ? isWhitePlayer && localGameState.clock?.started : !isWhitePlayer && localGameState.clock?.started}>
-                <TimerIcon />
-                <Typography variant="h6">
-                  {localIsWhitePlayer ? 'White' : 'Black'}: {formatTime(localIsWhitePlayer ? clocks.white : clocks.black)}
-                </Typography>
-              </ClockDisplay>
-            </ClockContainer>
+            {renderClocks()}
 
             <Typography 
               variant="body2" 
-              sx={{
+              sx={{ 
+                color: 'text.secondary',
                 textAlign: 'center',
-                fontStyle: 'italic'
+                marginTop: 1
               }}
             >
-              Playing as: {localIsWhitePlayer ? 'White' : localIsBlackPlayer ? 'Black' : 'Spectator'}
+              {localIsWhitePlayer ? 'You are playing as White' : localIsBlackPlayer ? 'You are playing as Black' : 'You are a spectator'}
             </Typography>
           </Box>
         </Box>
 
-        {/* Right Side - Game Controls */}
-        <Box sx={{ 
-          minWidth: '180px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2
-        }}>
-          {/* Game Controls */}
-          {(localIsWhitePlayer || localIsBlackPlayer) && (
-            <Paper elevation={3} sx={{ p: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 2 }}>Game Controls</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  onClick={() => onLeaveGame?.()}
-                  fullWidth
-                  sx={{
-                    textTransform: 'none',
-                    '&:hover': {
-                      backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                      borderColor: 'error.main',
-                      color: 'error.main'
-                    }
-                  }}
-                >
-                  Leave Game
-                </Button>
-                {localGameState.status === 'active' && (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={handleResign}
-                    fullWidth
-                    sx={{
-                      textTransform: 'none',
-                      borderColor: 'error.main',
-                      color: 'error.main',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255, 0, 0, 0.1)'
-                      }
-                    }}
-                  >
-                    Resign
-                  </Button>
-                )}
-              </Box>
-            </Paper>
-          )}
+        {/* Side Panel */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: '200px' }}>
+          {/* Captured Pieces */}
+          <Paper sx={{ 
+            padding: '1rem',
+            width: '180px',
+            backgroundColor: 'background.paper'
+          }}>
+            <Typography variant="h6" sx={{ marginBottom: 2 }}>
+              Captured Pieces
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {renderCapturedPieces()}
+            </Box>
+          </Paper>
+
+          {/* Move History */}
+          <Paper sx={{ 
+            padding: '1rem',
+            minWidth: '200px',
+            minHeight: '100px',
+            backgroundColor: 'background.paper',
+            maxHeight: '400px',
+            overflowY: 'auto'
+          }}>
+            <Typography variant="h6" sx={{ marginBottom: 2 }}>
+              Move History
+            </Typography>
+            {moveHistory.length > 0 ? (
+              renderMoveHistory()
+            ) : (
+              <Typography variant="body2" sx={{ color: 'text.secondary', p: 1 }}>
+                No moves yet
+              </Typography>
+            )}
+          </Paper>
         </Box>
-      </GameContainer>
+      </Box>
 
-      {/* Dialogs */}
-      <Dialog 
-        open={showGameOverDialog} 
-        onClose={() => setShowGameOverDialog(false)}
-        PaperProps={{
-          sx: {
-            backgroundColor: 'rgba(44, 44, 44, 0.95)',
-            color: '#fff',
-            minWidth: '300px',
-            textAlign: 'center',
-            padding: '20px'
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          textAlign: 'center', 
-          fontSize: '24px',
-          pb: 1
-        }}>
-          Game Over
-        </DialogTitle>
-        <DialogContent sx={{ 
-          display: 'flex', 
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          pb: 3
-        }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            {gameOverMessage}
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ 
-          display: 'flex',
-          justifyContent: 'center',
-          pb: 2
-        }}>
-          <Button
-            onClick={() => {
-              setShowGameOverDialog(false);
-              if(onLeaveGame) onLeaveGame();
-            }}
-            variant="contained"
-            sx={{
-              backgroundColor: '#86c1b9',
-              '&:hover': {
-                backgroundColor: '#aaf0e6'
-              }
-            }}
-          >
-            RETURN HOME
-          </Button>
-        </DialogActions>
-      </Dialog>
-
+      {/* Game Over Dialog */}
       <Dialog
-        open={showRematchDialog}
-        onClose={() => setShowRematchDialog(false)}
-        sx={{
-          '& .MuiDialog-paper': {
-            bgcolor: 'background.paper',
-            boxShadow: 24,
-            p: 4,
-            minWidth: 300,
-          },
-        }}
+        open={showGameOverDialog}
+        onClose={() => setShowGameOverDialog(false)}
       >
-        <DialogTitle>Rematch Request</DialogTitle>
+        <DialogTitle>Game Over</DialogTitle>
         <DialogContent>
           <Typography>{gameOverMessage}</Typography>
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => handleRematchResponse(true)}
-            variant="contained"
-            color="primary"
-          >
-            accept
-          </Button>
-          <Button
-            onClick={() => handleRematchResponse(false)}
-            variant="outlined"
-            color="error"
-          >
-            decline
+          <Button onClick={() => setShowGameOverDialog(false)}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </GameRoomContainer>
   );
 };
