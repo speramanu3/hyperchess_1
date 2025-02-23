@@ -33,21 +33,23 @@ export const HomePage: React.FC<HomePageProps> = ({ onCreateGame, onJoinGame }) 
       >
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography
-            variant="h2"
+            variant="h1"
             component="h1"
             gutterBottom
             sx={{
               mb: 4,
               fontWeight: 'bold',
-              background: 'linear-gradient(45deg, #60efff 30%, #7dff90 90%)',
-              backgroundClip: 'text',
-              textFillColor: 'transparent',
+              background: 'linear-gradient(45deg, #60EFFF 30%, #00FF87 90%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
+              textShadow: '0 2px 8px rgba(96, 239, 255, 0.3)',
               filter: 'drop-shadow(0 2px 8px rgba(96, 239, 255, 0.3))',
+              fontSize: '4.5rem',
+              letterSpacing: '0.05em',
+              textTransform: 'lowercase'
             }}
           >
-            HyperChess
+            hyperchess
           </Typography>
         </Box>
 
@@ -74,9 +76,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onCreateGame, onJoinGame }) 
               height: 56,
               fontSize: '1.2rem',
               fontWeight: 'bold',
+              textTransform: 'none'
             }}
           >
-            New Game
+            create new game
           </Button>
 
           <Box sx={{ position: 'relative', py: 2 }}>
@@ -87,51 +90,55 @@ export const HomePage: React.FC<HomePageProps> = ({ onCreateGame, onJoinGame }) 
                   px: 2, 
                   color: 'text.secondary',
                   fontWeight: 'medium',
+                  textTransform: 'lowercase'
                 }}
               >
-                OR
+                or
               </Typography>
             </Divider>
           </Box>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                textAlign: 'center',
+                textTransform: 'lowercase',
+                fontWeight: 'normal'
+              }}
+            >
+              join existing game
+            </Typography>
+
             <TextField
               fullWidth
-              label="Game ID"
               variant="outlined"
+              placeholder="enter game id"
               value={gameId}
               onChange={(e) => setGameId(e.target.value)}
               error={!!error}
               helperText={error}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  height: 56,
-                  '& fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.23)',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.4)',
-                  },
-                },
+              sx={{ 
+                '& input': { 
+                  textTransform: 'lowercase'
+                }
               }}
             />
+
             <Button
-              variant="contained"
-              color="success"
+              variant="outlined"
+              color="primary"
               size="large"
               fullWidth
               onClick={handleJoinGame}
+              disabled={!gameId.trim()}
               sx={{
                 height: 56,
                 fontSize: '1.2rem',
-                fontWeight: 'bold',
-                backgroundColor: '#66bb6a',
-                '&:hover': {
-                  backgroundColor: '#4caf50',
-                },
+                textTransform: 'none'
               }}
             >
-              Join Game
+              join game
             </Button>
           </Box>
         </Paper>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { GameRoom } from './components/GameRoom';
+import { HomePage } from './components/HomePage';
 import { useGameState } from './hooks/useGameState';
 import { useSocket } from './hooks/useSocket';
 import { Box, Button, Typography, TextField } from '@mui/material';
@@ -23,92 +24,6 @@ const darkTheme = createTheme({
   },
 });
 
-interface HomePageProps {
-  onCreateGame: () => void;
-  onJoinGame: (gameId: string) => void;
-}
-
-const HomePage: React.FC<HomePageProps> = ({ onCreateGame, onJoinGame }) => {
-  const [joinGameId, setJoinGameId] = useState('');
-
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        gap: 3,
-      }}
-    >
-      <Typography 
-        variant="h2" 
-        component="h1"
-        sx={{
-          fontWeight: 'bold',
-          background: 'linear-gradient(45deg, #60efff 30%, #7dff90 90%)',
-          backgroundClip: 'text',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          mb: 4,
-        }}
-      >
-        Chess Game
-      </Typography>
-
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={onCreateGame}
-        sx={{ 
-          minWidth: '200px',
-          fontSize: '1.2rem',
-          py: 1.5,
-        }}
-      >
-        Create New Game
-      </Button>
-
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 2,
-          mt: 2,
-        }}
-      >
-        <Typography variant="h6">
-          Or Join Existing Game
-        </Typography>
-        
-        <TextField
-          variant="outlined"
-          placeholder="Enter Game ID"
-          value={joinGameId}
-          onChange={(e) => setJoinGameId(e.target.value)}
-          sx={{ minWidth: '300px' }}
-        />
-        
-        <Button
-          variant="outlined"
-          color="secondary"
-          onClick={() => joinGameId && onJoinGame(joinGameId)}
-          disabled={!joinGameId}
-          sx={{ 
-            minWidth: '200px',
-            fontSize: '1.1rem',
-            py: 1,
-          }}
-        >
-          Join Game
-        </Button>
-      </Box>
-    </Box>
-  );
-};
-
 const initialGameState: GameState = {
   gameId: '',
   position: '',
@@ -122,34 +37,46 @@ const initialGameState: GameState = {
 function App() {
   const socket = useSocket();
   const { gameState, makeMove } = useGameState(socket);
-  const isWhitePlayer = gameState.players?.white === socket?.id;
-  const isBlackPlayer = gameState.players?.black === socket?.id;
-  const isInGame = gameState.status === 'active' || (gameState.status === 'waiting' && gameState.gameId);
+  const [showGame, setShowGame] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCreateGame = () => {
-    if (socket) {
-      socket.emit('createGame');
+    if (!socket) {
+      setError('Unable to connect to server');
+      return;
     }
+    socket.emit('createGame');
+    setShowGame(true);
   };
 
   const handleJoinGame = (gameId: string) => {
-    if (socket) {
-      socket.emit('joinGame', gameId);
+    if (!socket) {
+      setError('Unable to connect to server');
+      return;
     }
+    socket.emit('joinGame', gameId);
+    setShowGame(true);
   };
 
   const handleLeaveGame = () => {
     if (socket && gameState.gameId) {
       socket.emit('leaveGame', { gameId: gameState.gameId });
     }
+    setShowGame(false);
   };
+
+  const isWhitePlayer = socket?.id === gameState.players.white;
+  const isBlackPlayer = socket?.id === gameState.players.black;
 
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      {!isInGame ? (
-        <HomePage onCreateGame={handleCreateGame} onJoinGame={handleJoinGame} />
-      ) : (
+      {error && (
+        <div style={{ color: 'red', textAlign: 'center', padding: '1rem' }}>
+          {error}
+        </div>
+      )}
+      {showGame ? (
         <GameRoom 
           gameState={gameState}
           onMove={makeMove}
@@ -158,6 +85,8 @@ function App() {
           socket={socket}
           onLeaveGame={handleLeaveGame}
         />
+      ) : (
+        <HomePage onCreateGame={handleCreateGame} onJoinGame={handleJoinGame} />
       )}
     </ThemeProvider>
   );

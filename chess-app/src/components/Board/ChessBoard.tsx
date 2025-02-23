@@ -28,62 +28,68 @@ interface ChessSquareProps {
   isValidMove: boolean;
 }
 
-const ChessSquare = styled(Box)<ChessSquareProps>(({ theme, isLight, isSelected, isValidMove }) => ({
-  aspectRatio: '1/1',
+const ChessSquare = styled('div')<{ isLight: boolean; isSelected: boolean; isValidMove: boolean }>(({ isLight, isSelected, isValidMove }) => ({
+  width: '80px',
+  height: '80px',
+  backgroundColor: isSelected 
+    ? '#fff3cd'
+    : isValidMove
+      ? isLight ? '#90EE90' : '#32CD32'  // Light and dark green for valid moves
+      : isLight ? '#F0D9B5' : '#B58863',
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  backgroundColor: isSelected
-    ? '#f7d794'
-    : isValidMove
-    ? '#fadb5f'
-    : isLight
-    ? '#f0e9d8'
-    : '#4a9f45',
-  cursor: 'pointer',
-  transition: 'background-color 0.2s',
-  '&:hover': {
-    backgroundColor: isSelected ? '#f7d794' : isValidMove ? '#fadb5f' : '#6ab04c',
-  },
   position: 'relative',
+  '&::after': isValidMove ? {
+    content: '""',
+    position: 'absolute',
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    zIndex: 1,
+    pointerEvents: 'none'
+  } : {},
 }));
 
 const PieceImage = styled('img')({
-  width: '90%',
-  height: '90%',
-  objectFit: 'contain',
-  userSelect: 'none',
+  width: '65px',  // Increased from 50px
+  height: '65px', // Increased from 50px
   cursor: 'grab',
+  userSelect: 'none',
+  transition: 'transform 0.1s',
   '&:active': {
     cursor: 'grabbing',
-  },
-});
-
-const DraggedPiece = styled('div')({
-  position: 'fixed',
-  pointerEvents: 'none',
-  zIndex: 1000,
-  width: '80px',
-  height: '80px',
-  transform: 'translate(-50%, -50%)',
-  '& img': {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
   },
 });
 
 export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlayer, isBlackPlayer }) => {
   const [selectedSquare, setSelectedSquare] = React.useState<Square | null>(null);
   const [validMoves, setValidMoves] = React.useState<Square[]>([]);
-  const [draggedPiece, setDraggedPiece] = React.useState<{ square: Square; image: string } | null>(null);
-  const [dragPosition, setDragPosition] = React.useState({ x: 0, y: 0 });
+  const [draggedPiece, setDraggedPiece] = React.useState<{ square: Square; element: HTMLElement | null } | null>(null);
   const chess = new Chess(fen);
+
+  const calculateValidMoves = (square: Square): Square[] => {
+    try {
+      // Get all moves from this position
+      const moves = chess.moves({ square, verbose: true });
+      
+      // Extract just the destination squares
+      return moves.map(move => move.to as Square);
+    } catch (error) {
+      console.error('Error calculating moves:', error);
+      return [];
+    }
+  };
 
   React.useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (draggedPiece) {
-        setDragPosition({ x: e.clientX, y: e.clientY });
+        // Update piece position during drag
+        if (draggedPiece.element) {
+          draggedPiece.element.style.left = `${e.clientX - draggedPiece.element.offsetWidth / 2}px`;
+          draggedPiece.element.style.top = `${e.clientY - draggedPiece.element.offsetHeight / 2}px`;
+        }
       }
     };
 
@@ -91,29 +97,36 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlay
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [draggedPiece]);
 
-  const calculateValidMoves = (square: Square): Square[] => {
-    try {
-      return chess.moves({ square, verbose: true }).map(move => move.to as Square);
-    } catch {
-      return [];
-    }
-  };
-
   const handleSquareClick = (square: Square) => {
+    const piece = chess.get(square);
+    
+    // If a square was already selected
     if (selectedSquare) {
-      if (validMoves.includes(square)) {
-        onMove({ from: selectedSquare, to: square });
+      // Try to make a move
+      try {
+        const moveResult = chess.move({
+          from: selectedSquare,
+          to: square,
+          promotion: 'q'
+        });
+
+        if (moveResult) {
+          onMove({ from: selectedSquare, to: square });
+        }
+      } catch (error) {
+        console.error('Move error:', error);
       }
+      
       setSelectedSquare(null);
       setValidMoves([]);
-    } else {
-      const piece = chess.get(square);
-      if (piece) {
-        const isWhitePiece = piece.color === 'w';
-        if ((isWhitePlayer && isWhitePiece) || (isBlackPlayer && !isWhitePiece)) {
-          setSelectedSquare(square);
-          setValidMoves(calculateValidMoves(square));
-        }
+    } 
+    // If no square was selected and the clicked square has a piece
+    else if (piece) {
+      // Only allow selecting own pieces
+      const isWhitePiece = piece.color === 'w';
+      if ((isWhitePlayer && isWhitePiece) || (isBlackPlayer && !isWhitePiece)) {
+        setSelectedSquare(square);
+        setValidMoves(calculateValidMoves(square));
       }
     }
   };
@@ -124,25 +137,61 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlay
 
     const isWhitePiece = piece.color === 'w';
     if ((isWhitePlayer && isWhitePiece) || (isBlackPlayer && !isWhitePiece)) {
-      const image = getPieceImage(piece);
-      setDraggedPiece({ square, image });
-      setDragPosition({ x: e.clientX, y: e.clientY });
-      setSelectedSquare(square);
-      setValidMoves(calculateValidMoves(square));
+      const pieceElement = e.target as HTMLImageElement;
       
-      // Set drag data and hide default ghost image
+      // Create a custom drag image that matches the piece size
+      const dragImage = new Image();
+      dragImage.src = pieceElement.src;
+      dragImage.width = 65;
+      dragImage.height = 65;
+      e.dataTransfer.setDragImage(dragImage, 32, 32);
+      
+      // Calculate and show valid moves
+      const moves = calculateValidMoves(square);
+      setValidMoves(moves);
+      setSelectedSquare(square);
+      setDraggedPiece({ square, element: pieceElement });
+      
       e.dataTransfer.setData('text/plain', square);
       e.dataTransfer.effectAllowed = 'move';
-      const emptyImage = document.createElement('img');
-      emptyImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-      e.dataTransfer.setDragImage(emptyImage, 0, 0);
 
-      // Make the original piece semi-transparent
-      const target = e.target as HTMLElement;
-      target.style.opacity = '0.5';
+      pieceElement.style.transform = 'scale(1.05)';
     } else {
       e.preventDefault();
     }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    if (draggedPiece?.element && !e.defaultPrevented && e.clientX && e.clientY) {
+      const element = draggedPiece.element;
+      element.style.position = 'fixed';
+      element.style.zIndex = '1000';
+      element.style.pointerEvents = 'none';
+      element.style.width = '65px';   // Match the new size
+      element.style.height = '65px';  // Match the new size
+      element.style.left = `${e.clientX - 32}px`; // Adjust center point
+      element.style.top = `${e.clientY - 32}px`;  // Adjust center point
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (draggedPiece?.element) {
+      const element = draggedPiece.element;
+      // Reset all styles
+      element.style.position = '';
+      element.style.zIndex = '';
+      element.style.pointerEvents = '';
+      element.style.left = '';
+      element.style.top = '';
+      element.style.width = '';
+      element.style.height = '';
+      element.style.transform = '';
+    }
+    
+    // Clear valid moves when piece is dropped
+    setSelectedSquare(null);
+    setValidMoves([]);
+    setDraggedPiece(null);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -154,8 +203,36 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlay
     e.preventDefault();
     const sourceSquare = e.dataTransfer.getData('text/plain') as Square;
     
-    if (validMoves.includes(targetSquare)) {
-      onMove({ from: sourceSquare, to: targetSquare });
+    // Get the piece at the source square
+    const piece = chess.get(sourceSquare);
+    if (!piece) {
+      handleInvalidDrop();
+      return;
+    }
+
+    // Verify it's the player's piece
+    const isWhitePiece = piece.color === 'w';
+    if ((isWhitePlayer && !isWhitePiece) || (isBlackPlayer && isWhitePiece)) {
+      handleInvalidDrop();
+      return;
+    }
+
+    try {
+      // Attempt the move
+      const moveResult = chess.move({
+        from: sourceSquare,
+        to: targetSquare,
+        promotion: 'q' // Always promote to queen for simplicity
+      });
+
+      if (moveResult) {
+        onMove({ from: sourceSquare, to: targetSquare });
+      } else {
+        handleInvalidDrop();
+      }
+    } catch (error) {
+      console.error('Move error:', error);
+      handleInvalidDrop();
     }
     
     setSelectedSquare(null);
@@ -163,14 +240,19 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlay
     setDraggedPiece(null);
   };
 
-  const handleDragEnd = (e: React.DragEvent) => {
-    // Restore opacity of the original piece
-    const target = e.target as HTMLElement;
-    target.style.opacity = '1';
-    
-    setSelectedSquare(null);
-    setValidMoves([]);
-    setDraggedPiece(null);
+  const handleInvalidDrop = () => {
+    // Reset the piece to its original position
+    if (draggedPiece?.element) {
+      const element = draggedPiece.element;
+      element.style.position = '';
+      element.style.zIndex = '';
+      element.style.pointerEvents = '';
+      element.style.left = '';
+      element.style.top = '';
+      element.style.width = '';
+      element.style.height = '';
+      element.style.transform = '';
+    }
   };
 
   const getPieceImage = (piece: Piece | null): string => {
@@ -202,19 +284,21 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlay
 
     for (const rank of orderedRanks) {
       for (const file of orderedFiles) {
-        squares.push(`${file}${rank}` as Square);
+        const square = `${file}${rank}` as Square;
+        squares.push(square);
       }
     }
-
     return squares;
   };
 
   return (
     <BoardContainer>
-      {generateSquares().map((square, index) => {
+      {generateSquares().map((square) => {
+        const file = square[0];
+        const rank = parseInt(square[1]);
+        const isLight = (file.charCodeAt(0) - 'a'.charCodeAt(0) + rank) % 2 === 0;
         const piece = chess.get(square);
-        const isLight = (Math.floor(index / 8) + (index % 8)) % 2 === 0;
-        const isSelected = square === selectedSquare;
+        const isSelected = selectedSquare === square;
         const isValidMove = validMoves.includes(square);
 
         return (
@@ -224,31 +308,25 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlay
             isSelected={isSelected}
             isValidMove={isValidMove}
             onClick={() => handleSquareClick(square)}
-            onDragOver={handleDragOver}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+            }}
             onDrop={(e) => handleDrop(e, square)}
           >
             {piece && (
               <PieceImage
                 src={getPieceImage(piece)}
                 alt={`${piece.color}${piece.type}`}
-                draggable={true}
+                draggable
                 onDragStart={(e) => handleDragStart(e, square)}
+                onDrag={handleDrag}
                 onDragEnd={handleDragEnd}
               />
             )}
           </ChessSquare>
         );
       })}
-      {draggedPiece && (
-        <DraggedPiece
-          style={{
-            left: `${dragPosition.x}px`,
-            top: `${dragPosition.y}px`,
-          }}
-        >
-          <img src={draggedPiece.image} alt="Dragged piece" />
-        </DraggedPiece>
-      )}
     </BoardContainer>
   );
 };
