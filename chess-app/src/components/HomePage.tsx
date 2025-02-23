@@ -31,10 +31,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onCreateGame, onJoinGame }) 
           pb: 4,
         }}
       >
-        <Box sx={{ textAlign: 'center', py: 4 }}>
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography
             variant="h2"
             component="h1"
+            gutterBottom
             sx={{
               mb: 4,
               fontWeight: 'bold',
@@ -46,7 +47,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onCreateGame, onJoinGame }) 
               filter: 'drop-shadow(0 2px 8px rgba(96, 239, 255, 0.3))',
             }}
           >
-            Hyperchess
+            HyperChess
           </Typography>
         </Box>
 
