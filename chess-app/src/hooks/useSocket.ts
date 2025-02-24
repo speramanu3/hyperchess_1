@@ -9,13 +9,13 @@ export const useSocket = (): Socket | null => {
   useEffect(() => {
     console.log('Connecting to socket server...', SOCKET_SERVER_URL);
     const newSocket = io(SOCKET_SERVER_URL, {
-      transports: ['websocket'],
-      upgrade: false,
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       autoConnect: true,
-      withCredentials: false
+      withCredentials: true,
+      forceNew: true
     });
 
     newSocket.on('connect', () => {

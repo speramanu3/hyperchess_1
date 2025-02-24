@@ -6,23 +6,35 @@ import { Chess } from 'chess.js';
 
 const app = express();
 const httpServer = createServer(app);
+
+// Get allowed origins from environment variable or use default
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? 
+  process.env.ALLOWED_ORIGINS.split(',') : 
+  ['https://hyperchess-1-emri86aql-sujay-peramanus-projects.vercel.app'];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: "*",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
-    allowedHeaders: ["*"],
     credentials: true
   },
-  allowEIO3: true
+  allowEIO3: true,
+  transports: ['websocket', 'polling']
 });
 
 const games = new Map();
 
+// Apply CORS middleware
 app.use(cors({
-  origin: '*',
+  origin: allowedOrigins,
   methods: ['GET', 'POST'],
-  allowedHeaders: ['*']
+  credentials: true
 }));
+
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.send('Chess server is running');
+});
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
