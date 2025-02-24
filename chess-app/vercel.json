@@ -6,6 +6,5 @@
   ],
   "env": {
     "REACT_APP_SOCKET_SERVER_URL": "https://hyperchess-1-production.up.railway.app"
-  },
-  "rootDirectory": "chess-app"
+  }
 }
