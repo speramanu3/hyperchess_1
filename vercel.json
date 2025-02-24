@@ -3,5 +3,8 @@
   "outputDirectory": "chess-app/build",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "env": {
+    "REACT_APP_SOCKET_SERVER_URL": "https://hyperchess-1-production.up.railway.app"
+  }
 }
