@@ -1,26 +1,3 @@
-<<<<<<< Updated upstream
-import { styled } from '@mui/material/styles';
-import { 
-  Box, 
-  Button, 
-  Dialog, 
-  DialogActions, 
-  DialogContent, 
-  DialogTitle, 
-  IconButton,
-  Paper, 
-  Tooltip,
-  Typography,
-  BoxProps
-} from '@mui/material';
-import TimerIcon from '@mui/icons-material/Timer';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import React, { useEffect, useRef, useState } from 'react';
-import { Chess } from 'chess.js';
-import { ChessBoard } from './Board/ChessBoard';
-import { useSocket } from '../hooks/useSocket';
-import { GameState } from '../types/game';
-=======
 import React, { useState, useEffect } from 'react';
 import { 
   Box, 
@@ -37,10 +14,9 @@ import {
 import { styled } from '@mui/material/styles';
 import { ChessBoard } from './Board/ChessBoard';
 import { GameState, GameMove } from '../types/game';
-import { Chess, PieceSymbol } from 'chess.js';
+import { Chess } from 'chess.js';
 import FileCopyIcon from '@mui/icons-material/FileCopy';
 import InfoIcon from '@mui/icons-material/Info';
->>>>>>> Stashed changes
 
 interface GameRoomProps {
   gameState: GameState;
@@ -49,14 +25,6 @@ interface GameRoomProps {
   isBlackPlayer: boolean;
   socket: any;
   onLeaveGame: () => void; 
-}
-
-interface ClockUpdate {
-  white: number;
-  black: number;
-  lastMoveTime?: number;
-  started: boolean;
-  paused?: boolean;
 }
 
 interface GameUpdateData {
@@ -73,65 +41,17 @@ interface MoveMadeData {
   position: string;
   moveHistory?: string[];
   captures?: { white: string[]; black: string[] };
-  clocks?: ClockUpdate;
 }
 
 const GameRoomContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  padding: '20px'
+  padding: theme.spacing(3),
+  height: '100vh',
+  backgroundColor: theme.palette.background.default,
+  color: theme.palette.text.primary,
 }));
-
-const ClockContainer = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  justifyContent: 'space-between',
-  width: '100%',
-  maxWidth: '600px',
-  margin: '20px 0',
-
-  '& .clock': {
-    padding: '10px 20px',
-    borderRadius: '5px',
-    backgroundColor: theme.palette.grey[100],
-    fontSize: '24px',
-    fontWeight: 'bold',
-    minWidth: '120px',
-    textAlign: 'center',
-    
-    '&.active': {
-      backgroundColor: theme.palette.success.main,
-      color: theme.palette.success.contrastText
-    }
-  }
-}));
-
-const GameContainer = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  gap: '2rem',
-  alignItems: 'flex-start',
-  justifyContent: 'center',
-  padding: '2rem',
-}));
-
-const GameTitle = styled(Box)({
-  color: '#8BA1B5',
-  padding: '10px',
-  marginBottom: '20px',
-  background: '#2A2A2A',
-  borderRadius: '8px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between'
-});
-
-const GameId = styled('span')({
-  fontSize: '14px',
-});
-
-const GameStatus = styled('span')({
-  marginLeft: 'auto',
-});
 
 const GameLayout = styled('div')({
   display: 'flex',
@@ -225,26 +145,14 @@ const CapturedPiecesContainer = styled(Paper)(({ theme }) => ({
 const PiecesSection = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexWrap: 'wrap',
-<<<<<<< Updated upstream
-  gap: '0.5rem',
-  justifyContent: 'center'
-}));
-
-const CapturedPiece = styled('img')(({ theme }) => ({
-  width: '30px',
-  height: '30px',
-  objectFit: 'contain',
-}));
-=======
   gap: '8px',
   marginBottom: '1rem',
-});
+}));
 
 const CapturedPiece = styled('img')({
   width: '32px',
   height: '32px'
 });
->>>>>>> Stashed changes
 
 const MoveHistoryContainer = styled(Paper)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
@@ -256,9 +164,6 @@ const MoveHistoryContainer = styled(Paper)(({ theme }) => ({
   flexDirection: 'column',
 }));
 
-<<<<<<< Updated upstream
-const MoveEntry = styled(Box)(({ theme }) => ({
-=======
 const MoveHistoryList = styled(Box)({
   flex: 1,
   overflowY: 'auto',
@@ -279,7 +184,6 @@ const MoveHistoryList = styled(Box)({
 });
 
 const MoveEntry = styled(Box)({
->>>>>>> Stashed changes
   display: 'grid',
   gridTemplateColumns: '30px 85px 85px',
   padding: '4px 8px',
@@ -311,55 +215,8 @@ const StyledDialog = styled(Dialog)({
     minWidth: '400px',
     padding: '2rem'
   }
-}));
+});
 
-<<<<<<< Updated upstream
-const MoveNumber = styled('span')(({ theme }) => ({
-  textAlign: 'right',
-  paddingRight: '8px',
-  fontWeight: 'bold'
-}));
-
-const MoveText = styled('span')(({ theme }) => ({
-  textAlign: 'left',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap'
-}));
-
-interface ClockDisplayProps extends BoxProps {
-  active?: boolean;
-}
-
-const ClockDisplay = styled(Box, {
-  shouldForwardProp: prop => prop !== 'active'
-})<ClockDisplayProps>(({ theme, active }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  padding: '8px 16px',
-  borderRadius: '4px',
-  backgroundColor: active ? theme.palette.success.main : theme.palette.grey[800],
-  color: active ? theme.palette.success.contrastText : theme.palette.grey[100],
-  transition: 'background-color 0.3s ease'
-}));
-
-const GameHeader = styled('div')(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  padding: '12px',
-  backgroundColor: '#2c2c2c',
-  borderRadius: '4px',
-  marginBottom: '20px',
-}));
-
-const GameId = styled('span')(({ theme }) => ({
-  color: '#86c1b9',
-  fontFamily: 'monospace',
-  fontSize: '14px',
-}));
-=======
 const StyledDialogTitle = styled(DialogTitle)({
   color: '#86c1b9',
   fontSize: '2rem',
@@ -379,12 +236,6 @@ const StyledDialogActions = styled(DialogActions)({
   justifyContent: 'center',
   gap: '1rem'
 });
->>>>>>> Stashed changes
-
-const GameStatus = styled('span')(({ theme }) => ({
-  color: '#86c1b9',
-  marginLeft: 'auto',
-}));
 
 const getPieceValue = (piece: string): number => {
   switch (piece) {
@@ -428,13 +279,6 @@ const getPieceName = (piece: string): string => {
   return `${colorName} ${pieceName}`;
 };
 
-<<<<<<< Updated upstream
-const formatTime = (ms: number) => {
-  const totalSeconds = Math.ceil(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-=======
 const getGameStatusMessage = (position: string) => {
   const chess = new Chess(position);
   
@@ -456,7 +300,6 @@ const getGameStatusMessage = (position: string) => {
   }
   
   return null;
->>>>>>> Stashed changes
 };
 
 export const GameRoom: React.FC<GameRoomProps> = ({
@@ -475,16 +318,9 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     ? 'Draw' 
     : null;
 
-  const [isGameOverState, setIsGameOver] = React.useState(isGameOver);
-  const [gameOverMessage, setGameOverMessage] = React.useState(winner ? `${winner} wins!` : '');
-  const [rematchRequested, setRematchRequested] = React.useState(false);
-  const [rematchOffered, setRematchOffered] = React.useState(false);
-  const [showRematchDialog, setShowRematchDialog] = React.useState(false);
   const [showGameOverDialog, setShowGameOverDialog] = React.useState(false);
   const [localGameState, setLocalGameState] = React.useState(gameState);
   const [localGameId, setLocalGameId] = React.useState(gameState.gameId);
-  const [localIsWhitePlayer, setLocalIsWhitePlayer] = React.useState(isWhitePlayer);
-  const [localIsBlackPlayer, setLocalIsBlackPlayer] = React.useState(isBlackPlayer);
   const [capturedPieces, setCapturedPieces] = React.useState<{
     white: string[];
     black: string[];
@@ -492,41 +328,21 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     white: [],
     black: []
   });
-
-  const [moveHistory, setMoveHistory] = React.useState<string[]>([]);
-  const [copied, setCopied] = React.useState(false);
-  const [clockState, setClockState] = React.useState<ClockUpdate>({
-    white: 5 * 60 * 1000, // 5 minutes in milliseconds
-    black: 5 * 60 * 1000,
-    started: false
-  });
-
-  const handleCopyClick = () => {
-    navigator.clipboard.writeText(localGameId).then(() => {
-      setCopied(true);
-      // Reset the copied state after 2 seconds
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
+  const [gameOverMessage, setGameOverMessage] = React.useState('');
+  const [showCopiedTooltip, setShowCopiedTooltip] = React.useState(false);
+  const [isGameOverState, setIsGameOver] = React.useState(isGameOver);
 
   // Update local state when props change
   useEffect(() => {
     console.log('Game state update - Turn:', localGameState.turn, 'Position:', localGameState.position);
     setLocalGameState(gameState);
     setLocalGameId(gameState.gameId);
-    setLocalIsWhitePlayer(isWhitePlayer);
-    setLocalIsBlackPlayer(isBlackPlayer);
-  }, [gameState, isWhitePlayer, isBlackPlayer]);
+  }, [gameState]);
 
-<<<<<<< Updated upstream
-  // Add socket event listener for game state updates
-  React.useEffect(() => {
+  // Socket event handlers
+  useEffect(() => {
     if (socket) {
-      socket.on('gameState', (updatedGame: GameState) => {
-        setLocalGameState(updatedGame);
-      });
-
-      socket.on('game_update', (data: GameUpdateData) => {
+      socket.on('game_update', (data: any) => {
         console.log('Received game update:', data);
         
         switch (data.type) {
@@ -550,8 +366,8 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             if (data.player) {
               setIsGameOver(true);
               setShowGameOverDialog(true);
-              if ((data.player === 'white' && localIsWhitePlayer) || 
-                  (data.player === 'black' && localIsBlackPlayer)) {
+              if ((data.player === 'white' && isWhitePlayer) || 
+                  (data.player === 'black' && isBlackPlayer)) {
                 setGameOverMessage(`You resigned. ${data.player === 'white' ? 'Black' : 'White'} wins!`);
               } else {
                 setGameOverMessage(`${data.player === 'white' ? 'White' : 'Black'} resigned. You win!`);
@@ -561,11 +377,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         }
       });
 
-      socket.on('clockUpdate', (updatedClock: ClockUpdate) => {
-        setClockState(updatedClock);
-      });
-
-      socket.on('moveMade', (data: MoveMadeData) => {
+      socket.on('moveMade', (data: any) => {
         console.log('Move made with data:', data);
         
         // Update game state
@@ -573,80 +385,14 @@ export const GameRoom: React.FC<GameRoomProps> = ({
           ...prev,
           position: data.position,
           moveHistory: data.moveHistory || prev.moveHistory,
-          captures: data.captures || prev.captures,
-          clock: data.clocks || prev.clock
+          captures: data.captures || prev.captures
         }));
 
         // Update move history if provided
         if (data.moveHistory) {
-          setMoveHistory(data.moveHistory);
-=======
-  // Add socket event listener for move updates
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleGameUpdate = (data: any) => {
-      switch (data.type) {
-        case 'resign':
-          setIsGameOver(true);
-          setShowGameOverDialog(true);
-          setGameOverMessage(`${data.player === 'white' ? 'White' : 'Black'} resigned. ${data.player === 'white' ? 'Black' : 'White'} wins!`);
-          setLocalGameState(prev => ({
-            ...prev,
-            status: 'completed'
-          }));
-          break;
-      }
-    };
-
-    const handleMoveMade = (data: { 
-      from: string; 
-      to: string; 
-      position: string;
-      turn: 'w' | 'b';
-      moveHistory?: string[];
-      gameStatus?: {
-        type: 'checkmate' | 'draw';
-        winner?: 'white' | 'black';
-        reason?: 'threefold' | 'stalemate' | 'insufficient';
-      };
-    }) => {
-      setLocalGameState(prev => ({
-        ...prev,
-        position: data.position,
-        turn: data.turn,
-        moveHistory: data.moveHistory || prev.moveHistory,
-        status: data.gameStatus ? 'completed' : prev.status
-      }));
-
-      if (data.gameStatus) {
-        setIsGameOver(true);
-        setShowGameOverDialog(true);
-        
-        if (data.gameStatus.type === 'checkmate') {
-          setGameOverMessage(`Checkmate! ${data.gameStatus.winner === 'white' ? 'White' : 'Black'} wins!`);
-        } else if (data.gameStatus.type === 'draw') {
-          let message = 'Game Over - ';
-          switch (data.gameStatus.reason) {
-            case 'threefold':
-              message += 'Draw by threefold repetition!';
-              break;
-            case 'stalemate':
-              message += 'Draw by stalemate! No legal moves available.';
-              break;
-            case 'insufficient':
-              message += 'Draw by insufficient material! Neither player can checkmate.';
-              break;
-            default:
-              message += 'Draw!';
-          }
-          setGameOverMessage(message);
->>>>>>> Stashed changes
+          // Update move history state
         }
-      }
-    };
 
-<<<<<<< Updated upstream
         // Update captures if provided
         if (data.captures) {
           setCapturedPieces(data.captures);
@@ -667,67 +413,25 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       });
 
       return () => {
-        socket.off('gameState');
         socket.off('game_update');
         socket.off('moveMade');
-        socket.off('clockUpdate');
       };
     }
-  }, [socket, localIsWhitePlayer, localIsBlackPlayer]);
-=======
-    socket.on('moveMade', handleMoveMade);
-    socket.on('game_update', handleGameUpdate);
-
-    return () => {
-      socket.off('moveMade', handleMoveMade);
-      socket.off('game_update', handleGameUpdate);
-    };
-  }, [socket]);
-
-  // Add socket event listener for game updates
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleGameUpdate = (data: any) => {
-      switch (data.type) {
-        case 'resign':
-          setIsGameOver(true);
-          setShowGameOverDialog(true);
-          setGameOverMessage(`${data.player === 'white' ? 'White' : 'Black'} resigned. ${data.player === 'white' ? 'Black' : 'White'} wins!`);
-          setLocalGameState(prev => ({
-            ...prev,
-            status: 'completed'
-          }));
-          break;
-      }
-    };
-
-    socket.on('game_update', handleGameUpdate);
-
-    return () => {
-      socket.off('game_update', handleGameUpdate);
-    };
-  }, [socket]);
->>>>>>> Stashed changes
-
-  // Add socket event listener for game state updates
-  useEffect(() => {
-    // Removed socket dependency
-  }, []);
+  }, [socket, isWhitePlayer, isBlackPlayer]);
 
   // Initialize move history from game state
   useEffect(() => {
     console.log('Game state updated:', localGameState);
     if (localGameState.moveHistory && localGameState.moveHistory.length > 0) {
       console.log('Setting move history from game state:', localGameState.moveHistory);
-      setMoveHistory(localGameState.moveHistory);
+      // Update move history state
     } else {
       try {
         // Fallback to calculating moves if server doesn't provide them
         const newChess = new Chess(localGameState.position);
         const moves = newChess.history();
         console.log('Calculated move history:', moves);
-        setMoveHistory(moves);
+        // Update move history state
       } catch (error) {
         console.error('Error updating move history:', error);
       }
@@ -773,12 +477,12 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     }
   };
 
-  const handleRematchRequest = () => {
-    // Removed socket dependency
-  };
-
-  const handleRematchResponse = (accept: boolean) => {
-    // Removed socket dependency
+  const handleCopyClick = () => {
+    navigator.clipboard.writeText(localGameId).then(() => {
+      setShowCopiedTooltip(true);
+      // Reset the copied state after 2 seconds
+      setTimeout(() => setShowCopiedTooltip(false), 2000);
+    });
   };
 
   const handleReturnHome = () => {
@@ -878,88 +582,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     return capturedPieces;
   };
 
-  // Add socket event types
-  type GameOverEvent = {
-    winner: 'White' | 'Black' | 'Draw';
-  };
-
-  type ResignEvent = {
-    player: 'white' | 'black';
-  };
-
-  type RematchRequestEvent = {
-    player: 'white' | 'black';
-  };
-
-<<<<<<< Updated upstream
-  // Format time for display
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  // Render clocks
-  const renderClocks = () => {
-    const currentPlayer = localGameState?.position ? new Chess(localGameState.position).turn() : 'w';
-    const isWhiteTurn = currentPlayer === 'w';
-    
-    return (
-      <ClockContainer>
-        <div className={`clock ${isWhiteTurn ? 'active' : ''}`}>
-          White: {formatTime(clockState.white)}
-        </div>
-        <div className={`clock ${!isWhiteTurn ? 'active' : ''}`}>
-          Black: {formatTime(clockState.black)}
-        </div>
-      </ClockContainer>
-    );
-  };
-=======
-  // Add socket listeners with proper types
-  React.useEffect(() => {
-    // Removed socket dependency
-  }, []);
-
-  // Update checkmate detection in useEffect
-  useEffect(() => {
-    const statusMessage = getGameStatusMessage(localGameState.position);
-    if (statusMessage) {
-      setIsGameOver(true);
-      setShowGameOverDialog(true);
-      setGameOverMessage(statusMessage);
-    }
-  }, [localGameState.position]);
->>>>>>> Stashed changes
-
-  // Render move history
-  const renderMoveHistory = () => {
-    return (
-      <MoveHistory>
-        <MoveList>
-          {localGameState.moveHistory && Array.from({ length: Math.ceil(localGameState.moveHistory.length / 2) }, (_, i) => {
-            const whiteMove = localGameState.moveHistory?.[i * 2];
-            const blackMove = localGameState.moveHistory?.[i * 2 + 1];
-            return (
-              <MovePair key={i}>
-                <MoveItem>
-                  <span className="move-number">{i + 1}.</span>
-                  {whiteMove}
-                  {blackMove && <span style={{ marginLeft: '8px' }}>{blackMove}</span>}
-                </MoveItem>
-              </MovePair>
-            );
-          })}
-        </MoveList>
-      </MoveHistory>
-    );
-  };
-
-  const handleCloseGameOver = () => {
-    setShowGameOverDialog(false);
-  };
-
   const renderCapturedPieces = () => {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -999,102 +621,33 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     );
   };
 
+  const renderMoveHistory = () => {
+    return (
+      <MoveHistory>
+        <MoveList>
+          {localGameState.moveHistory && Array.from({ length: Math.ceil(localGameState.moveHistory.length / 2) }, (_, i) => {
+            const whiteMove = localGameState.moveHistory?.[i * 2];
+            const blackMove = localGameState.moveHistory?.[i * 2 + 1];
+            return (
+              <MovePair key={i}>
+                <MoveItem>
+                  <span className="move-number">{i + 1}.</span>
+                  {whiteMove}
+                  {blackMove && <span style={{ marginLeft: '8px' }}>{blackMove}</span>}
+                </MoveItem>
+              </MovePair>
+            );
+          })}
+        </MoveList>
+      </MoveHistory>
+    );
+  };
+
+  const handleCloseGameOver = () => {
+    setShowGameOverDialog(false);
+  };
+
   return (
-<<<<<<< Updated upstream
-    <GameRoomContainer>
-      {/* Title */}
-      <Typography
-        variant="h1"
-        sx={{
-          fontSize: '2rem',
-          marginBottom: '2rem',
-          color: 'text.primary'
-        }}
-      >
-        Chess Game
-      </Typography>
-
-      {/* Game Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '8px',
-        width: '100%',
-        maxWidth: '800px',
-        marginBottom: '20px'
-      }}>
-        <Typography variant="subtitle1" sx={{ color: 'text.secondary' }}>
-          Game ID:
-        </Typography>
-        <Typography
-          sx={{
-            color: '#86c1b9',
-            fontFamily: 'monospace',
-            fontSize: '14px'
-          }}
-        >
-          {localGameId}
-        </Typography>
-        <Tooltip title={copied ? 'Copied!' : 'Copy game ID'}>
-          <IconButton
-            size="small"
-            onClick={handleCopyClick}
-            sx={{ ml: 1 }}
-          >
-            <ContentCopyIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Typography sx={{ 
-          marginLeft: 'auto',
-          color: '#86c1b9' 
-        }}>
-          Status: {localGameState.status}
-        </Typography>
-      </Box>
-
-      <Box sx={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {/* Game Area */}
-        <Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {/* Top Clock */}
-            {renderClocks()}
-
-            <ChessBoard
-              fen={localGameState.position}
-              onMove={handleMove}
-              orientation={localIsWhitePlayer ? 'white' : 'black'}
-            />
-
-            {/* Bottom Clock */}
-            {renderClocks()}
-
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                color: 'text.secondary',
-                textAlign: 'center',
-                marginTop: 1
-              }}
-            >
-              {localIsWhitePlayer ? 'You are playing as White' : localIsBlackPlayer ? 'You are playing as Black' : 'You are a spectator'}
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Side Panel */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: '200px' }}>
-          {/* Captured Pieces */}
-          <Paper sx={{ 
-            padding: '1rem',
-            width: '180px',
-            backgroundColor: 'background.paper'
-          }}>
-            <Typography variant="h6" sx={{ marginBottom: 2 }}>
-              Captured Pieces
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {renderCapturedPieces()}
-=======
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', p: 4 }}>
       <GameLayout>
         {/* Left Side */}
@@ -1111,7 +664,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             >
               Game ID: {localGameId?.substring(0, 8)}
             </Typography>
-            <Tooltip title={copied ? "Copied!" : "Copy Game ID"}>
+            <Tooltip title={showCopiedTooltip ? "Copied!" : "Copy Game ID"}>
               <IconButton size="small" onClick={handleCopyClick}>
                 <FileCopyIcon sx={{ color: '#86c1b9', fontSize: '1.2rem' }} />
               </IconButton>
@@ -1120,57 +673,10 @@ export const GameRoom: React.FC<GameRoomProps> = ({
 
           {/* Captured Pieces */}
           <Paper elevation={3} sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 2 }}>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ mb: 0.5, color: '#86c1b9' }}>White captured:</Typography>
-              <PiecesSection>
-                {capturedPieces.white.map((piece, index) => (
-                  <Tooltip key={index} title={getPieceName(piece)}>
-                    <CapturedPiece
-                      src={getPieceImage(piece)}
-                      alt={getPieceName(piece)}
-                    />
-                  </Tooltip>
-                ))}
-              </PiecesSection>
-            </Box>
-            <Box>
-              <Typography variant="body2" sx={{ mb: 0.5, color: '#86c1b9' }}>Black captured:</Typography>
-              <PiecesSection>
-                {capturedPieces.black.map((piece, index) => (
-                  <Tooltip key={index} title={getPieceName(piece)}>
-                    <CapturedPiece
-                      src={getPieceImage(piece)}
-                      alt={getPieceName(piece)}
-                    />
-                  </Tooltip>
-                ))}
-              </PiecesSection>
->>>>>>> Stashed changes
-            </Box>
+            {renderCapturedPieces()}
           </Paper>
 
           {/* Move History */}
-<<<<<<< Updated upstream
-          <Paper sx={{ 
-            padding: '1rem',
-            minWidth: '200px',
-            minHeight: '100px',
-            backgroundColor: 'background.paper',
-            maxHeight: '400px',
-            overflowY: 'auto'
-          }}>
-            <Typography variant="h6" sx={{ marginBottom: 2 }}>
-              Move History
-            </Typography>
-            {moveHistory.length > 0 ? (
-              renderMoveHistory()
-            ) : (
-              <Typography variant="body2" sx={{ color: 'text.secondary', p: 1 }}>
-                No moves yet
-              </Typography>
-            )}
-          </Paper>
-=======
           {renderMoveHistory()}
         </SidePanel>
 
@@ -1197,8 +703,8 @@ export const GameRoom: React.FC<GameRoomProps> = ({
           <ChessBoard
             fen={localGameState.position}
             onMove={handleMove}
-            isWhitePlayer={localIsWhitePlayer}
-            isBlackPlayer={localIsBlackPlayer}
+            isWhitePlayer={isWhitePlayer}
+            isBlackPlayer={isBlackPlayer}
           />
 
           <Typography
@@ -1209,7 +715,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
               fontStyle: 'italic',
             }}
           >
-            Playing as: {localIsWhitePlayer ? 'White' : localIsBlackPlayer ? 'Black' : 'Spectator'}
+            Playing as: {isWhitePlayer ? 'White' : isBlackPlayer ? 'Black' : 'Spectator'}
           </Typography>
         </Box>
 
@@ -1229,7 +735,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
           >
             leave game
           </Button>
-          {(localIsWhitePlayer || localIsBlackPlayer) && localGameState.status === 'active' && (
+          {(isWhitePlayer || isBlackPlayer) && localGameState.status === 'active' && (
             <Button
               variant="outlined"
               onClick={handleResign}
@@ -1245,28 +751,10 @@ export const GameRoom: React.FC<GameRoomProps> = ({
               resign
             </Button>
           )}
->>>>>>> Stashed changes
         </Box>
       </GameLayout>
 
       {/* Game Over Dialog */}
-<<<<<<< Updated upstream
-      <Dialog
-        open={showGameOverDialog}
-        onClose={() => setShowGameOverDialog(false)}
-      >
-        <DialogTitle>Game Over</DialogTitle>
-        <DialogContent>
-          <Typography>{gameOverMessage}</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowGameOverDialog(false)}>
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </GameRoomContainer>
-=======
       <StyledDialog 
         open={showGameOverDialog} 
         onClose={handleCloseGameOver}
@@ -1310,8 +798,8 @@ export const GameRoom: React.FC<GameRoomProps> = ({
 
       {/* Rematch Dialog */}
       <StyledDialog
-        open={showRematchDialog}
-        onClose={() => setShowRematchDialog(false)}
+        open={false}
+        onClose={() => {}}
       >
         <StyledDialogTitle>
           Rematch Request
@@ -1322,14 +810,14 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         <StyledDialogActions>
           <Button
             variant="contained"
-            onClick={() => handleRematchResponse(true)}
+            onClick={() => {}}
             color="primary"
           >
             accept
           </Button>
           <Button
             variant="outlined"
-            onClick={() => handleRematchResponse(false)}
+            onClick={() => {}}
             color="error"
           >
             decline
@@ -1337,6 +825,5 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         </StyledDialogActions>
       </StyledDialog>
     </Box>
->>>>>>> Stashed changes
   );
 };
