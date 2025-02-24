@@ -7,14 +7,16 @@ export const useSocket = (): Socket | null => {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    console.log('Connecting to socket server...');
+    console.log('Connecting to socket server...', SOCKET_SERVER_URL);
     const newSocket = io(SOCKET_SERVER_URL, {
-      transports: ['websocket', 'polling'],
-      upgrade: true,
+      transports: ['websocket'],
+      upgrade: false,
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      timeout: 20000
+      timeout: 20000,
+      withCredentials: true,
+      forceNew: true
     });
 
     newSocket.on('connect', () => {
