@@ -27,14 +27,14 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
     credentials: true
   },
-  transports: ['polling', 'websocket'], // Match client configuration
+  transports: ['polling', 'websocket'],
   pingTimeout: 60000,
   pingInterval: 25000,
-  allowUpgrades: true, // Allow transport upgrades
-  upgradeTimeout: 10000 // Give more time for upgrades
+  allowUpgrades: true,
+  upgradeTimeout: 10000
 });
 
-const games = new Map();
+const games = new Map<string, Chess>();
 
 // Apply CORS middleware
 app.use(cors({
@@ -50,7 +50,7 @@ app.get('/', (req, res) => {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     connections: io.engine.clientsCount,
-    transport: io.engine.opts.transports.join(',')
+    transport: io.engine.transport?.name || 'not connected'
   });
 });
 
@@ -63,14 +63,16 @@ io.engine.on('connection_error', (err) => {
   });
 });
 
-io.engine.on('initial_headers', (headers, req) => {
+io.engine.on('initial_headers', (headers: any) => {
   console.log('Initial headers:', headers);
 });
 
 io.on('connection', (socket) => {
+  const transport = socket.conn.transport?.name || 'unknown';
+  
   console.log('Client connected:', {
     id: socket.id,
-    transport: socket.conn.transport.name,
+    transport,
     query: socket.handshake.query
   });
 
@@ -124,7 +126,7 @@ io.on('connection', (socket) => {
     socket.emit('gameCreated', game);
   });
 
-  socket.on('joinGame', (gameId) => {
+  socket.on('joinGame', (gameId: string) => {
     console.log('Player joining game:', {
       clientId: socket.id,
       gameId
@@ -138,14 +140,16 @@ io.on('connection', (socket) => {
     }
     
     const game = games.get(gameId);
-    io.to(gameId).emit('gameState', {
-      fen: game.fen(),
-      turn: game.turn(),
-      gameOver: game.isGameOver()
-    });
+    if (game) {
+      io.to(gameId).emit('gameState', {
+        fen: game.fen(),
+        turn: game.turn(),
+        gameOver: game.isGameOver()
+      });
+    }
   });
 
-  socket.on('move', ({ gameId, move }) => {
+  socket.on('move', ({ gameId, move }: { gameId: string; move: any }) => {
     console.log('Move received:', {
       clientId: socket.id,
       gameId,
@@ -187,9 +191,9 @@ httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log('Server configuration:', {
     allowedOrigins,
-    socketTransports: io.engine.opts.transports,
+    socketTransports: io.opts?.transports || ['polling', 'websocket'],
     clientCount: io.engine.clientsCount,
-    pingInterval: io.engine.opts.pingInterval,
-    pingTimeout: io.engine.opts.pingTimeout
+    pingInterval: io.opts?.pingInterval,
+    pingTimeout: io.opts?.pingTimeout
   });
 });
