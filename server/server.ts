@@ -10,9 +10,10 @@ const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
 // Get allowed origins from environment variable or use default
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? 
-  process.env.ALLOWED_ORIGINS.split(',') : 
-  ['https://hyperchess-1-emri86aql-sujay-peramanus-projects.vercel.app', 'http://localhost:3000'];
+const allowedOrigins = [
+  'https://hyperchess-1-emri86aql-sujay-peramanus-projects.vercel.app',
+  'http://localhost:3000'
+];
 
 console.log('Starting server with configuration:', {
   port: PORT,
@@ -21,17 +22,16 @@ console.log('Starting server with configuration:', {
 });
 
 const io = new Server(httpServer, {
-  path: '/socket.io/',
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
-    credentials: true,
-    allowedHeaders: ["*"]
+    credentials: true
   },
-  allowEIO3: true,
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'], // Match client configuration
   pingTimeout: 60000,
-  pingInterval: 25000
+  pingInterval: 25000,
+  allowUpgrades: true, // Allow transport upgrades
+  upgradeTimeout: 10000 // Give more time for upgrades
 });
 
 const games = new Map();
@@ -46,14 +46,16 @@ app.use(cors({
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.send({
+  res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    connections: io.engine.clientsCount
+    connections: io.engine.clientsCount,
+    transport: io.engine.opts.transports.join(',')
   });
 });
 
-io.engine.on("connection_error", (err) => {
+// Socket.IO connection handling
+io.engine.on('connection_error', (err) => {
   console.error('Connection error:', {
     code: err.code,
     message: err.message,
@@ -61,20 +63,36 @@ io.engine.on("connection_error", (err) => {
   });
 });
 
+io.engine.on('initial_headers', (headers, req) => {
+  console.log('Initial headers:', headers);
+});
+
 io.on('connection', (socket) => {
   console.log('Client connected:', {
     id: socket.id,
-    transport: socket.conn.transport.name
+    transport: socket.conn.transport.name,
+    query: socket.handshake.query
+  });
+
+  socket.conn.on('upgrade', (transport) => {
+    console.log('Transport upgraded for client:', {
+      clientId: socket.id,
+      transport: transport.name
+    });
   });
 
   socket.on('error', (error) => {
-    console.error('Socket error:', error);
+    console.error('Socket error:', {
+      clientId: socket.id,
+      error
+    });
   });
 
   socket.on('disconnect', (reason) => {
     console.log('Client disconnected:', {
       id: socket.id,
-      reason
+      reason,
+      transport: socket.conn.transport?.name
     });
     games.forEach((game, gameId) => {
       if (game.players.white === socket.id || game.players.black === socket.id) {
@@ -107,33 +125,49 @@ io.on('connection', (socket) => {
   });
 
   socket.on('joinGame', (gameId) => {
-    console.log('Player joining game:', gameId);
-    const game = games.get(gameId);
-    if (game && !game.players.black) {
-      game.players.black = socket.id;
-      game.status = 'playing';
-      socket.join(gameId);
-      io.to(gameId).emit('gameJoined', game);
+    console.log('Player joining game:', {
+      clientId: socket.id,
+      gameId
+    });
+    
+    socket.join(gameId);
+    
+    if (!games.has(gameId)) {
+      games.set(gameId, new Chess());
+      console.log('New game created:', gameId);
     }
+    
+    const game = games.get(gameId);
+    io.to(gameId).emit('gameState', {
+      fen: game.fen(),
+      turn: game.turn(),
+      gameOver: game.isGameOver()
+    });
   });
 
-  socket.on('move', (data) => {
-    console.log('Move received:', data.gameId, data.move);
-    const game = games.get(data.gameId);
+  socket.on('move', ({ gameId, move }) => {
+    console.log('Move received:', {
+      clientId: socket.id,
+      gameId,
+      move
+    });
+    
+    const game = games.get(gameId);
     if (game) {
       try {
-        game.position = data.position;
-        game.turn = data.turn;
-        game.moveHistory = data.moveHistory;
-        game.captures = data.captures;
-        io.to(data.gameId).emit('moveMade', {
-          position: data.position,
-          turn: data.turn,
-          moveHistory: data.moveHistory,
-          captures: data.captures
+        game.move(move);
+        io.to(gameId).emit('gameState', {
+          fen: game.fen(),
+          turn: game.turn(),
+          gameOver: game.isGameOver()
         });
       } catch (e) {
-        console.error('Invalid move:', e);
+        console.error('Invalid move:', {
+          clientId: socket.id,
+          gameId,
+          move,
+          error: e
+        });
         socket.emit('error', 'Invalid move');
       }
     }
@@ -154,6 +188,8 @@ httpServer.listen(PORT, () => {
   console.log('Server configuration:', {
     allowedOrigins,
     socketTransports: io.engine.opts.transports,
-    clientCount: io.engine.clientsCount
+    clientCount: io.engine.clientsCount,
+    pingInterval: io.engine.opts.pingInterval,
+    pingTimeout: io.engine.opts.pingTimeout
   });
 });
