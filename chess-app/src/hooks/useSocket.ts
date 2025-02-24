@@ -9,22 +9,28 @@ export const useSocket = (): Socket | null => {
   useEffect(() => {
     console.log('Connecting to socket server...', SOCKET_SERVER_URL);
     const newSocket = io(SOCKET_SERVER_URL, {
-      transports: ['websocket'],
-      upgrade: false,
+      transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      timeout: 20000,
-      withCredentials: true,
-      forceNew: true
+      autoConnect: true,
+      withCredentials: false,
+      path: '/socket.io',
+      extraHeaders: {
+        'Access-Control-Allow-Origin': '*'
+      }
     });
 
     newSocket.on('connect', () => {
-      console.log('Socket connected:', newSocket.id);
+      console.log('Socket connected successfully:', newSocket.id);
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
+      console.error('Socket connection error:', error.message);
+      // Try to reconnect with polling if websocket fails
+      if (error.message.includes('websocket')) {
+        newSocket.io.opts.transports = ['polling', 'websocket'];
+      }
     });
 
     newSocket.on('error', (error) => {
