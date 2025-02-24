@@ -7,19 +7,27 @@ import { Chess } from 'chess.js';
 const app = express();
 const httpServer = createServer(app);
 
+const PORT = process.env.PORT || 3001;
+
 // Get allowed origins from environment variable or use default
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? 
   process.env.ALLOWED_ORIGINS.split(',') : 
-  ['https://hyperchess-1-emri86aql-sujay-peramanus-projects.vercel.app'];
+  ['https://hyperchess-1-emri86aql-sujay-peramanus-projects.vercel.app', 'http://localhost:3000'];
+
+console.log('Allowed origins:', allowedOrigins);
 
 const io = new Server(httpServer, {
+  path: '/socket.io/',
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
+    allowedHeaders: ["*"]
   },
   allowEIO3: true,
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 const games = new Map();
@@ -28,7 +36,8 @@ const games = new Map();
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST'],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
 // Health check endpoint
@@ -38,6 +47,20 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
+
+  socket.on('error', (error) => {
+    console.error('Socket error:', error);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('Client disconnected:', socket.id, 'Reason:', reason);
+    games.forEach((game, gameId) => {
+      if (game.players.white === socket.id || game.players.black === socket.id) {
+        io.to(gameId).emit('playerLeft');
+        games.delete(gameId);
+      }
+    });
+  });
 
   socket.on('createGame', () => {
     const gameId = Math.random().toString(36).substring(7);
@@ -62,6 +85,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('joinGame', (gameId) => {
+    console.log('Player joining game:', gameId);
     const game = games.get(gameId);
     if (game && !game.players.black) {
       game.players.black = socket.id;
@@ -72,6 +96,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('move', (data) => {
+    console.log('Move received:', data.gameId, data.move);
     const game = games.get(data.gameId);
     if (game) {
       game.position = data.position;
@@ -86,19 +111,13 @@ io.on('connection', (socket) => {
       });
     }
   });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-    games.forEach((game, gameId) => {
-      if (game.players.white === socket.id || game.players.black === socket.id) {
-        io.to(gameId).emit('playerLeft');
-        games.delete(gameId);
-      }
-    });
-  });
 });
 
-const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log('Server configuration:', {
+    allowedOrigins,
+    socketPath: io.path(),
+    transports: io.engine.opts.transports
+  });
 });

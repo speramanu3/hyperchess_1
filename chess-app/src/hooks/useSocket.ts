@@ -9,10 +9,12 @@ export const useSocket = (): Socket | null => {
   useEffect(() => {
     console.log('Connecting to socket server...', SOCKET_SERVER_URL);
     const newSocket = io(SOCKET_SERVER_URL, {
+      path: '/socket.io/',
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: 5,
       reconnectionDelay: 1000,
+      timeout: 20000,
       autoConnect: true,
       withCredentials: true,
       forceNew: true
@@ -24,6 +26,11 @@ export const useSocket = (): Socket | null => {
 
     newSocket.on('connect_error', (error) => {
       console.error('Socket connection error:', error.message);
+      // Try polling if websocket fails
+      if (error.message.includes('websocket')) {
+        console.log('Falling back to polling transport');
+        newSocket.io.opts.transports = ['polling'];
+      }
     });
 
     newSocket.on('error', (error) => {
