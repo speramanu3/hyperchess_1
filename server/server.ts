@@ -14,7 +14,11 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS ?
   process.env.ALLOWED_ORIGINS.split(',') : 
   ['https://hyperchess-1-emri86aql-sujay-peramanus-projects.vercel.app', 'http://localhost:3000'];
 
-console.log('Allowed origins:', allowedOrigins);
+console.log('Starting server with configuration:', {
+  port: PORT,
+  allowedOrigins,
+  nodeEnv: process.env.NODE_ENV
+});
 
 const io = new Server(httpServer, {
   path: '/socket.io/',
@@ -42,18 +46,36 @@ app.use(cors({
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.send('Chess server is running');
+  res.send({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    connections: io.engine.clientsCount
+  });
+});
+
+io.engine.on("connection_error", (err) => {
+  console.error('Connection error:', {
+    code: err.code,
+    message: err.message,
+    context: err.context
+  });
 });
 
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  console.log('Client connected:', {
+    id: socket.id,
+    transport: socket.conn.transport.name
+  });
 
   socket.on('error', (error) => {
     console.error('Socket error:', error);
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('Client disconnected:', socket.id, 'Reason:', reason);
+    console.log('Client disconnected:', {
+      id: socket.id,
+      reason
+    });
     games.forEach((game, gameId) => {
       if (game.players.white === socket.id || game.players.black === socket.id) {
         io.to(gameId).emit('playerLeft');
@@ -99,25 +121,39 @@ io.on('connection', (socket) => {
     console.log('Move received:', data.gameId, data.move);
     const game = games.get(data.gameId);
     if (game) {
-      game.position = data.position;
-      game.turn = data.turn;
-      game.moveHistory = data.moveHistory;
-      game.captures = data.captures;
-      io.to(data.gameId).emit('moveMade', {
-        position: data.position,
-        turn: data.turn,
-        moveHistory: data.moveHistory,
-        captures: data.captures
-      });
+      try {
+        game.position = data.position;
+        game.turn = data.turn;
+        game.moveHistory = data.moveHistory;
+        game.captures = data.captures;
+        io.to(data.gameId).emit('moveMade', {
+          position: data.position,
+          turn: data.turn,
+          moveHistory: data.moveHistory,
+          captures: data.captures
+        });
+      } catch (e) {
+        console.error('Invalid move:', e);
+        socket.emit('error', 'Invalid move');
+      }
     }
   });
+});
+
+// Error handling
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection:', reason);
 });
 
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log('Server configuration:', {
     allowedOrigins,
-    socketPath: io.path(),
-    transports: io.engine.opts.transports
+    socketTransports: io.engine.opts.transports,
+    clientCount: io.engine.clientsCount
   });
 });
