@@ -2,23 +2,17 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files first for better caching
-COPY chess-app/package*.json ./
+# Copy server package files
+COPY server/package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy the rest of the app
-COPY chess-app/ ./
+# Copy server code
+COPY server/ ./
 
-# Build the app
-RUN npm run build
+# Start the server
+CMD ["npm", "start"]
 
-# Install serve to run the built app
-RUN npm install -g serve
-
-# Expose port 3000
-EXPOSE 3000
-
-# Start the app
-CMD ["serve", "-s", "build", "-l", "3000"]
+# Expose port 3001
+EXPOSE 3001
