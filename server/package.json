@@ -1,11 +1,12 @@
 {
   "name": "chess-server",
   "version": "1.0.0",
+  "type": "module",
   "main": "server.ts",
   "scripts": {
-    "start": "ts-node server.ts",
+    "start": "node --loader ts-node/esm server.ts",
     "build": "tsc",
-    "dev": "nodemon server.ts"
+    "dev": "nodemon --exec node --loader ts-node/esm server.ts"
   },
   "dependencies": {
     "chess.js": "^1.0.0-beta.6",
