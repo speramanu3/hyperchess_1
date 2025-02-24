@@ -28,9 +28,15 @@ const initialGameState: GameState = {
   gameId: '',
   position: '',
   status: 'waiting',
+  turn: 'w',
   players: {
     white: null,
     black: null
+  },
+  moveHistory: [],
+  captures: {
+    white: [],
+    black: []
   }
 };
 

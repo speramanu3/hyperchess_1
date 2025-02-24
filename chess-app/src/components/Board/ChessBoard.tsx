@@ -4,7 +4,7 @@ import { Chess, Square, Piece } from 'chess.js';
 
 interface ChessBoardProps {
   fen: string;
-  onMove: (move: { from: string; to: string }) => void;
+  onMove: (sourceSquare: Square, targetSquare: Square) => void;
   isWhitePlayer: boolean;
   isBlackPlayer: boolean;
 }
@@ -111,7 +111,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlay
         });
 
         if (moveResult) {
-          onMove({ from: selectedSquare, to: square });
+          onMove(selectedSquare, square);
         }
       } catch (error) {
         console.error('Move error:', error);
@@ -226,7 +226,7 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlay
       });
 
       if (moveResult) {
-        onMove({ from: sourceSquare, to: targetSquare });
+        onMove(sourceSquare, targetSquare);
       } else {
         handleInvalidDrop();
       }
@@ -289,6 +289,13 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({ fen, onMove, isWhitePlay
       }
     }
     return squares;
+  };
+
+  const handleMove = (sourceSquare: Square, targetSquare: Square) => {
+    if (onMove) {
+      onMove(sourceSquare, targetSquare);
+    }
+    return true;
   };
 
   return (

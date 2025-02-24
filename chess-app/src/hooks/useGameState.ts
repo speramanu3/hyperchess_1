@@ -1,108 +1,80 @@
 import { useState, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
 import { Chess } from 'chess.js';
+import { GameState, GameMove } from '../types/game';
 
-interface GameState {
-  gameId: string;
-  position: string;
-  status: 'waiting' | 'active' | 'completed';
-  players: {
-    white: string | null;
-    black: string | null;
-  };
-}
-
-const initialGameState: GameState = {
+const initialState: GameState = {
   gameId: '',
   position: new Chess().fen(),
   status: 'waiting',
+  turn: 'w',
   players: {
     white: null,
     black: null
+  },
+  moveHistory: [],
+  captures: {
+    white: [],
+    black: []
   }
 };
 
 export const useGameState = (socket: Socket | null) => {
-  const [gameState, setGameState] = useState<GameState>(initialGameState);
+  const [gameState, setGameState] = useState<GameState>(initialState);
 
   useEffect(() => {
     if (!socket) return;
 
     const handleGameCreated = (game: GameState) => {
-      console.log('Game created:', game);
       setGameState(game);
     };
 
     const handleGameJoined = (game: GameState) => {
-      console.log('Game joined:', game);
       setGameState(game);
     };
 
-    const handleMoveMade = ({ from, to, position }: { from: string; to: string; position: string }) => {
-      console.log('Move made:', { from, to, position });
+    const handleGameState = (game: GameState) => {
+      setGameState(game);
+    };
+
+    const handleMoveMade = (data: { 
+      from: string; 
+      to: string; 
+      position: string;
+      turn: 'w' | 'b';
+      moveHistory?: string[];
+      captures?: {
+        white: string[];
+        black: string[];
+      };
+    }) => {
       setGameState(prev => ({
         ...prev,
-        position
+        position: data.position,
+        turn: data.turn,
+        moveHistory: data.moveHistory || prev.moveHistory,
+        captures: data.captures || prev.captures
       }));
-    };
-
-    const handleError = (error: any) => {
-      console.error('Socket error:', error);
-    };
-
-    const handlePlayerDisconnected = () => {
-      console.log('Player disconnected');
-      setGameState(prev => ({
-        ...prev,
-        status: 'waiting'
-      }));
-    };
-
-    const handleGameOver = (winner: string) => {
-      console.log('Game over, winner:', winner);
-      setGameState(prev => ({
-        ...prev,
-        status: 'completed'
-      }));
-    };
-
-    const handleRematchAccepted = (newGameState: GameState) => {
-      console.log('Rematch accepted:', newGameState);
-      setGameState(newGameState);
-    };
-
-    const handleGameReset = () => {
-      console.log('Game reset');
-      setGameState(initialGameState);
     };
 
     socket.on('gameCreated', handleGameCreated);
     socket.on('gameJoined', handleGameJoined);
+    socket.on('gameState', handleGameState);
     socket.on('moveMade', handleMoveMade);
-    socket.on('error', handleError);
-    socket.on('playerDisconnected', handlePlayerDisconnected);
-    socket.on('gameOver', handleGameOver);
-    socket.on('rematchAccepted', handleRematchAccepted);
-    socket.on('gameReset', handleGameReset);
 
     return () => {
       socket.off('gameCreated', handleGameCreated);
       socket.off('gameJoined', handleGameJoined);
+      socket.off('gameState', handleGameState);
       socket.off('moveMade', handleMoveMade);
-      socket.off('error', handleError);
-      socket.off('playerDisconnected', handlePlayerDisconnected);
-      socket.off('gameOver', handleGameOver);
-      socket.off('rematchAccepted', handleRematchAccepted);
-      socket.off('gameReset', handleGameReset);
     };
   }, [socket]);
 
-  const makeMove = (move: { from: string; to: string }) => {
+  const makeMove = (move: GameMove) => {
     if (!socket || !gameState.gameId) return;
-    
-    socket.emit('makeMove', {
-      ...move,
-      gameId: gameState.gameId
+    socket.emit('makeMove', { 
+      gameId: gameState.gameId, 
+      ...move
     });
   };
 

@@ -30,6 +30,7 @@ interface GameState {
   gameId: string;
   position: string;
   status: 'waiting' | 'active' | 'completed';
+  turn: 'w' | 'b';
   players: {
     white: string | null;
     black: string | null;
@@ -40,6 +41,7 @@ interface GameState {
     black: string[];
   };
   moveHistory?: string[];
+  positionHistory?: string[];
   lastActivityTime: number;
   createdAt: number;
   clock?: {
@@ -119,6 +121,7 @@ io.on('connection', (socket) => {
         gameId,
         position: new Chess().fen(),
         status: 'waiting',
+        turn: 'w',
         players: {
           white: socket.id,
           black: null
@@ -129,6 +132,7 @@ io.on('connection', (socket) => {
           white: [],
           black: []
         },
+        positionHistory: [new Chess().fen()],
         lastActivityTime: now,
         createdAt: now,
         clock: {
@@ -194,7 +198,12 @@ io.on('connection', (socket) => {
         socket.join(gameId);
         
         games.set(gameId, game);
+<<<<<<< Updated upstream
         io.to(gameId).emit('gameJoined', game);
+=======
+        socket.emit('gameJoined', game);
+        io.to(gameId).emit('gameState', game);
+>>>>>>> Stashed changes
         logGameState('Player Joined');
       }
     } catch (error) {
@@ -212,6 +221,7 @@ io.on('connection', (socket) => {
       }
 
       const chess = new Chess(game.position);
+<<<<<<< Updated upstream
       
       // Verify it's the player's turn
       const isWhiteMove = chess.turn() === 'w';
@@ -331,9 +341,88 @@ io.on('connection', (socket) => {
         });
       }
 
+=======
+      const move = chess.move({ from, to });
+
+      if (move) {
+        const newPosition = chess.fen();
+        
+        // Initialize or update position history
+        if (!game.positionHistory) {
+          game.positionHistory = [game.position];
+        }
+        game.positionHistory.push(newPosition);
+
+        // Check for threefold repetition
+        const positions = game.positionHistory.map(fen => {
+          const fenParts = fen.split(' ');
+          return fenParts.slice(0, 4).join(' ');
+        });
+
+        const isThreefoldRepetition = positions.some(pos => {
+          return positions.filter(p => p === pos).length >= 3;
+        });
+
+        // Update game state
+        game.position = newPosition;
+        game.turn = chess.turn();
+        game.lastActivityTime = Date.now();
+
+        if (!game.moveHistory) {
+          game.moveHistory = [];
+        }
+        game.moveHistory.push(`${from}${to}`);
+
+        // Check game ending conditions
+        let gameStatus = null;
+
+        // Create a new Chess instance for validation to ensure fresh state
+        const validator = new Chess(newPosition);
+        
+        if (validator.isCheckmate()) {
+          gameStatus = {
+            type: 'checkmate',
+            winner: validator.turn() === 'w' ? 'black' : 'white'
+          };
+          game.status = 'completed';
+        } else if (validator.isStalemate()) {
+          gameStatus = {
+            type: 'draw',
+            reason: 'stalemate'
+          };
+          game.status = 'completed';
+        } else if (validator.isInsufficientMaterial()) {
+          gameStatus = {
+            type: 'draw',
+            reason: 'insufficient'
+          };
+          game.status = 'completed';
+        } else if (isThreefoldRepetition) {
+          gameStatus = {
+            type: 'draw',
+            reason: 'threefold'
+          };
+          game.status = 'completed';
+        }
+
+        // Broadcast the move and game status
+        io.to(gameId).emit('moveMade', {
+          from,
+          to,
+          position: newPosition,
+          turn: validator.turn(),
+          moveHistory: game.moveHistory,
+          gameStatus
+        });
+
+        games.set(gameId, game);
+      } else {
+        socket.emit('error', 'Invalid move');
+      }
+>>>>>>> Stashed changes
     } catch (error) {
       console.error('Error making move:', error);
-      socket.emit('error', 'Failed to make move');
+      socket.emit('error', 'Invalid move');
     }
   });
 
@@ -350,6 +439,7 @@ io.on('connection', (socket) => {
         gameId: uuidv4(),
         position: new Chess().fen(),
         status: 'active',
+        turn: 'w',
         players: {
           white: game.players.black,
           black: game.players.white
@@ -360,6 +450,7 @@ io.on('connection', (socket) => {
           white: [],
           black: []
         },
+        positionHistory: [new Chess().fen()],
         lastActivityTime: Date.now(),
         createdAt: Date.now()
       };
@@ -380,14 +471,19 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('game_action', ({ type, gameId, move, player }) => {
+  socket.on('game_action', (data: { 
+    type: string;
+    gameId: string;
+    player: 'white' | 'black';
+  }) => {
     try {
-      const game = games.get(gameId);
+      const game = games.get(data.gameId);
       if (!game) {
-        console.log(`Game not found: ${gameId}`);
+        socket.emit('error', 'Game not found');
         return;
       }
 
+<<<<<<< Updated upstream
       switch (type) {
         case 'move':
           console.log(`Move in game ${gameId} by ${player}:`, move);
@@ -445,112 +541,46 @@ io.on('connection', (socket) => {
           }
           logGameState('After Move');
           break;
+=======
+      // Update activity time
+      game.lastActivityTime = Date.now();
+>>>>>>> Stashed changes
 
+      switch (data.type) {
         case 'resign':
           game.status = 'completed';
-          io.to(gameId).emit('game_update', {
+          const winner = data.player === 'white' ? 'Black' : 'White';
+          io.to(data.gameId).emit('game_update', {
             type: 'resign',
-            player,
-            game
+            player: data.player,
+            winner
           });
-          logGameState('After Resign');
-          break;
-
-        case 'request_rematch':
-          io.to(gameId).emit('game_update', {
-            type: 'rematch_requested',
-            player,
-            game
-          });
-          logGameState('Rematch Requested');
-          break;
-
-        case 'accept_rematch':
-          // Create a new game with players swapped
-          const newGameId = uuidv4();
-          const newGame: GameState = {
-            gameId: newGameId,
-            position: new Chess().fen(),
-            status: 'active',
-            players: {
-              white: game.players.black,
-              black: game.players.white
-            },
-            spectators: [],
-            moveHistory: [],
-            captures: {
-              white: [],
-              black: []
-            },
-            lastActivityTime: Date.now(),
-            createdAt: Date.now()
-          };
-
-          games.set(newGameId, newGame);
-          
-          // Move both players to the new game room
-          if (game.players.white) {
-            const whiteSocket = io.sockets.sockets.get(game.players.white);
-            if (whiteSocket) {
-              whiteSocket.leave(gameId);
-              whiteSocket.join(newGameId);
-            }
-          }
-          if (game.players.black) {
-            const blackSocket = io.sockets.sockets.get(game.players.black);
-            if (blackSocket) {
-              blackSocket.leave(gameId);
-              blackSocket.join(newGameId);
-            }
-          }
-          
-          // Notify players about the accepted rematch with the new game state
-          io.to(gameId).emit('game_update', {
-            type: 'rematch_accepted',
-            gameId: newGameId,
-            game: newGame
-          });
-          
-          // Delete the old game
-          games.delete(gameId);
-          logGameState('After Rematch Accept');
-          break;
-
-        case 'decline_rematch':
-          // Notify both players about the declined rematch
-          io.to(gameId).emit('game_update', {
-            type: 'rematch_declined',
-            player,
-            gameId: gameId
-          });
+          games.set(data.gameId, game);
+          logGameState('Player Resigned');
           break;
 
         case 'leave_game':
-          // Remove the player from the game
+          // Remove player from the game
           if (game.players.white === socket.id) {
             game.players.white = null;
           } else if (game.players.black === socket.id) {
             game.players.black = null;
           }
-
-          socket.leave(gameId);
-
-          // If both players are gone, remove the game
+          socket.leave(data.gameId);
+          
+          // If both players are gone, mark game as completed
           if (!game.players.white && !game.players.black) {
-            games.delete(gameId);
-          } else {
-            game.status = 'waiting';
-            games.set(gameId, game);
-            io.to(gameId).emit('game_update', {
-              type: 'player_left',
-              gameId: gameId
-            });
+            game.status = 'completed';
           }
+          
+          games.set(data.gameId, game);
+          io.to(data.gameId).emit('opponent_left');
+          logGameState('Player Left Game');
           break;
       }
     } catch (error) {
       console.error('Error handling game action:', error);
-      socket.emit('error', 'Failed to handle game action');
+      socket.emit('error', 'Failed to process game action');
     }
   });
 
