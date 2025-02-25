@@ -599,6 +599,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     setShowGameOverDialog(false);
   };
 
+  const handleReturnHome = () => {
+    setShowGameOverDialog(false);
+    onLeaveGame();
+  };
+
   if (error) {
     return <div className="text-red-500">Error: {error}</div>;
   }
@@ -699,12 +704,12 @@ export const GameRoom: React.FC<GameRoomProps> = ({
               color: '#86c1b9',
               borderColor: '#86c1b9',
               '&:hover': {
-                borderColor: '#86c1b9',
+                borderColor: '#6b9f99',
                 backgroundColor: 'rgba(134, 193, 185, 0.1)'
               }
             }}
           >
-            leave game
+            Return to Home
           </Button>
           {(isWhitePlayer || isBlackPlayer) && localGameState?.status === 'active' && (
             <Button
