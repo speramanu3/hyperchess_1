@@ -8,6 +8,9 @@ import { Chess } from 'chess.js';
 const app = express();
 app.use(cors());
 
+// Serve static files
+app.use(express.static('public'));
+
 // Add health check endpoint
 app.get('/', (req, res) => {
   res.json({ status: 'ok' });
@@ -24,14 +27,17 @@ const io = new Server(httpServer, {
       "http://localhost:3000",
       "https://hyperchess-1.vercel.app",
       "https://hyperchess-1-git-main-speramanu3.vercel.app",
-      "https://hyperchess-1-speramanu3.vercel.app"
+      "https://hyperchess-1-speramanu3.vercel.app",
+      "https://hyperchess1-production.up.railway.app"
     ],
     methods: ["GET", "POST"],
     allowedHeaders: ["my-custom-header"],
     credentials: true
   },
   path: '/socket.io',
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 // Add error handling for the server
