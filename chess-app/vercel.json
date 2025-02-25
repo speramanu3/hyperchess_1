@@ -6,5 +6,24 @@
   ],
   "env": {
     "REACT_APP_SOCKET_SERVER_URL": "https://hyperchess-1-production.up.railway.app"
-  }
+  },
+  "headers": [
+    {
+      "source": "/manifest.json",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET"
+        },
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
+    }
+  ]
 }
