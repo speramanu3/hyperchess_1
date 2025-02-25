@@ -342,9 +342,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     : null;
 
   const handleGameCompletion = () => {
-    if (!localGameState) return;
+    if (!localGameState) {
+      console.error('Cannot complete game: no game state');
+      return;
+    }
 
-    // Update game state with all required properties
     const updatedState: GameState = {
       gameId: localGameState.gameId,
       position: localGameState.position,
@@ -360,12 +362,14 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     };
     setLocalGameState(updatedState);
 
-    // Show game over dialog
     setShowGameOverDialog(true);
   };
 
   const handleMove = (from: string, to: string) => {
-    if (!localGameState) return;
+    if (!localGameState) {
+      console.error('Cannot make move: no game state');
+      return;
+    }
 
     try {
       const result = chess.move({ from, to });
@@ -373,14 +377,12 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         const updatedPosition = chess.fen();
         const updatedMoveHistory = [...localGameState.moveHistory, `${from}${to}`];
         
-        // Check game ending conditions
         const gameStatus = getGameStatusMessage(updatedPosition);
         
         if (gameStatus.isGameOver && gameStatus.message) {
           setGameOverMessage(gameStatus.message);
           handleGameCompletion();
         } else {
-          // Update local state for ongoing game
           const updatedState: GameState = {
             gameId: localGameState.gameId,
             position: updatedPosition,
@@ -394,7 +396,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
           setLocalGameState(updatedState);
         }
 
-        // Notify parent component
         onMove(from, to);
       }
     } catch (error) {
@@ -402,8 +403,36 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     }
   };
 
+  const handleResign = () => {
+    if (!localGameState) {
+      console.error('Cannot resign: no game state');
+      return;
+    }
+
+    const resigningPlayer = isWhitePlayer ? 'white' : 'black';
+    const winner = resigningPlayer === 'white' ? 'Black' : 'White';
+    
+    const updatedState: GameState = {
+      gameId: localGameState.gameId,
+      position: localGameState.position,
+      status: 'completed',
+      turn: localGameState.turn,
+      players: localGameState.players,
+      moveHistory: localGameState.moveHistory,
+      captures: localGameState.captures,
+      result: `${winner} wins by resignation`
+    };
+    
+    setLocalGameState(updatedState);
+    setGameOverMessage(`${resigningPlayer === 'white' ? 'White' : 'Black'} resigned. ${winner} wins!`);
+    setShowGameOverDialog(true);
+  };
+
   const handleJoinGame = (color: 'white' | 'black') => {
-    if (!localGameState) return;
+    if (!localGameState) {
+      console.error('Cannot join game: missing game state');
+      return;
+    }
 
     const updatedState: GameState = {
       gameId: localGameState.gameId,
@@ -421,30 +450,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     setLocalGameState(updatedState);
   };
 
-  const handleResign = () => {
-    if (isConnected && (isWhitePlayer || isBlackPlayer)) {
-      const resigningPlayer = isWhitePlayer ? 'white' : 'black';
-      
-      // Update game state
-      const updatedState: GameState = {
-        gameId: localGameState.gameId,
-        position: localGameState.position,
-        status: 'completed',
-        turn: localGameState.turn,
-        players: localGameState.players,
-        moveHistory: localGameState.moveHistory,
-        captures: localGameState.captures,
-        result: `${resigningPlayer === 'white' ? 'Black' : 'White'} wins by resignation`
-      };
-      setLocalGameState(updatedState);
-      
-      setGameOverMessage(`${resigningPlayer === 'white' ? 'White' : 'Black'} resigned. ${resigningPlayer === 'white' ? 'Black' : 'White'} wins!`);
-      setShowGameOverDialog(true);
-    }
-  };
-
-  // Initialize captured pieces when game starts and when position changes
-  React.useEffect(() => {
+  useEffect(() => {
     const chess = new Chess(localGameState.position);
     const newCapturedPieces = getCapturedPieces(chess);
     setCapturedPieces(newCapturedPieces);
@@ -459,7 +465,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       q_w: 0, q_b: 0,  // queens
     };
 
-    // Count current pieces
     chess.board().forEach(row => {
       if (!row) return;
       row.forEach(piece => {
@@ -470,7 +475,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       });
     });
 
-    // Initial piece counts
     const initialPieces = {
       p_w: 8, p_b: 8,  // pawns
       n_w: 2, n_b: 2,  // knights
@@ -479,7 +483,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       q_w: 1, q_b: 1,  // queens
     };
 
-    // Calculate captured pieces
     const capturedPieces = {
       white: [] as string[],
       black: [] as string[]
@@ -499,7 +502,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       }
     });
 
-    // Sort by piece value
     capturedPieces.white.sort((a, b) => getPieceValue(b.split('_')[0] as string) - getPieceValue(a.split('_')[0] as string));
     capturedPieces.black.sort((a, b) => getPieceValue(b.split('_')[0] as string) - getPieceValue(a.split('_')[0] as string));
 
