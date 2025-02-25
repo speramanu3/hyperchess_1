@@ -85,7 +85,7 @@ function App() {
       {showGame ? (
         <GameRoom 
           gameState={gameState}
-          onMove={makeMove}
+          onMove={(from, to) => makeMove(from, to)}
           isWhitePlayer={isWhitePlayer}
           isBlackPlayer={isBlackPlayer}
           socket={socket}

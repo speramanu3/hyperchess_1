@@ -24,6 +24,7 @@ interface GameRoomProps {
   isWhitePlayer: boolean;
   isBlackPlayer: boolean;
   onLeaveGame: () => void; 
+  onMove: (move: GameMove) => void;
 }
 
 interface GameUpdateData {
@@ -304,7 +305,8 @@ const getGameStatusMessage = (position: string) => {
 export const GameRoom: React.FC<GameRoomProps> = ({
   isWhitePlayer,
   isBlackPlayer,
-  onLeaveGame
+  onLeaveGame,
+  onMove
 }) => {
   const { gameId = '' } = useParams<{ gameId: string }>();
   const { isConnected, gameState, error, joinGame, makeMove } = useSocket();
@@ -365,7 +367,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             result: gameStatus
           };
           setLocalGameState(updatedGameState);
-          makeMove(gameId, `${from}${to}`);
+          onMove({ from, to });
         } else {
           // Game continues
           const updatedGameState: GameState = {
@@ -375,7 +377,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             turn: chess.turn()
           };
           setLocalGameState(updatedGameState);
-          makeMove(gameId, `${from}${to}`);
+          onMove({ from, to });
         }
       }
     } catch (error) {
