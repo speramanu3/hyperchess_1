@@ -302,23 +302,10 @@ const getGameStatusMessage = (position: string) => {
   return null;
 };
 
-export const GameRoom: React.FC<GameRoomProps> = ({
-  isWhitePlayer,
-  isBlackPlayer,
-  onLeaveGame,
-  onMove
-}) => {
+export const GameRoom: React.FC = () => {
+  const wsState = useSocket();
+  const { gameState } = wsState;
   const { gameId = '' } = useParams<{ gameId: string }>();
-  const { isConnected, gameState, error, joinGame, makeMove } = useSocket();
-
-  const chess = new Chess(gameState?.position);
-  const isGameOver = chess.isCheckmate() || chess.isDraw();
-  const winner = chess.isCheckmate() 
-    ? (chess.turn() === 'w' ? 'Black' : 'White') 
-    : chess.isDraw() 
-    ? 'Draw' 
-    : null;
-
   const [showGameOverDialog, setShowGameOverDialog] = React.useState(false);
   const [localGameState, setLocalGameState] = React.useState(gameState);
   const [localGameId, setLocalGameId] = React.useState(gameId);
@@ -331,13 +318,13 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   });
   const [gameOverMessage, setGameOverMessage] = React.useState('');
   const [showCopiedTooltip, setShowCopiedTooltip] = React.useState(false);
-  const [isGameOverState, setIsGameOver] = React.useState(isGameOver);
+  const [isGameOverState, setIsGameOver] = React.useState(false);
 
   useEffect(() => {
-    if (isConnected && gameId) {
-      joinGame(gameId);
+    if (wsState.isConnected && gameId) {
+      wsState.joinGame(gameId);
     }
-  }, [isConnected, gameId, joinGame]);
+  }, [wsState.isConnected, gameId, wsState.joinGame]);
 
   useEffect(() => {
     if (gameState) {
@@ -345,6 +332,17 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       setLocalGameId(gameId);
     }
   }, [gameState, gameId]);
+
+  const chess = new Chess(localGameState?.position);
+  const isGameOver = chess.isCheckmate() || chess.isDraw();
+  const winner = chess.isCheckmate() 
+    ? (chess.turn() === 'w' ? 'Black' : 'White') 
+    : chess.isDraw() 
+    ? 'Draw' 
+    : null;
+
+  const isWhitePlayer = wsState.id === localGameState?.players?.white;
+  const isBlackPlayer = wsState.id === localGameState?.players?.black;
 
   const handleMove = (from: string, to: string) => {
     try {
@@ -367,7 +365,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             result: gameStatus
           };
           setLocalGameState(updatedGameState);
-          onMove({ from, to });
         } else {
           // Game continues
           const updatedGameState: GameState = {
@@ -377,7 +374,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             turn: chess.turn()
           };
           setLocalGameState(updatedGameState);
-          onMove({ from, to });
         }
       }
     } catch (error) {
@@ -394,11 +390,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   };
 
   const handleReturnHome = () => {
-    onLeaveGame();
+    wsState.onLeaveGame();
   };
 
   const handleResign = () => {
-    if (isConnected && (isWhitePlayer || isBlackPlayer)) {
+    if (wsState.isConnected && (isWhitePlayer || isBlackPlayer)) {
       const resigningPlayer = isWhitePlayer ? 'white' : 'black';
       
       // Update local state immediately to show game over
@@ -542,11 +538,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     setShowGameOverDialog(false);
   };
 
-  if (error) {
-    return <div className="text-red-500">Error: {error}</div>;
+  if (wsState.error) {
+    return <div className="text-red-500">Error: {wsState.error}</div>;
   }
 
-  if (!isConnected) {
+  if (!wsState.isConnected) {
     return <div>Connecting to game...</div>;
   }
 
@@ -630,7 +626,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Button
             variant="outlined"
-            onClick={onLeaveGame}
+            onClick={handleReturnHome}
             sx={{
               color: '#86c1b9',
               borderColor: '#86c1b9',

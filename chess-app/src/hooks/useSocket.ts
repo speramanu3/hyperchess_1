@@ -4,10 +4,11 @@ import { GameState } from './useGameState';
 const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_SERVER_URL || 'ws://localhost:3002';
 
 interface ServerEvent {
-  type: 'gameState' | 'error' | 'ping';
+  type: 'gameState' | 'error' | 'ping' | 'connected';
   gameId?: string;
   state?: GameState;
   message?: string;
+  clientId?: string;
 }
 
 interface GameEvent {
@@ -20,6 +21,7 @@ export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [id, setId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   const connect = useCallback(() => {
@@ -37,6 +39,7 @@ export const useSocket = () => {
     ws.onclose = () => {
       console.log('WebSocket disconnected');
       setIsConnected(false);
+      setId(null);
       // Attempt to reconnect after 1 second
       setTimeout(connect, 1000);
     };
@@ -51,6 +54,11 @@ export const useSocket = () => {
         const data: ServerEvent = JSON.parse(event.data);
         
         switch (data.type) {
+          case 'connected':
+            if (data.clientId) {
+              setId(data.clientId);
+            }
+            break;
           case 'gameState':
             if (data.state) {
               setGameState(data.state);
@@ -102,6 +110,7 @@ export const useSocket = () => {
     isConnected,
     gameState,
     error,
+    id,
     joinGame,
     makeMove,
     leaveGame
