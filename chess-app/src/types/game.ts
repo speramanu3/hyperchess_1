@@ -40,6 +40,11 @@ export interface GameRoom {
   gameState: GameState;
 }
 
+export interface GameStatus {
+  isGameOver: boolean;
+  message: string | null;
+}
+
 export interface WebSocketState {
   isConnected: boolean;
   error: string | null;

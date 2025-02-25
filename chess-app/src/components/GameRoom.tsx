@@ -285,23 +285,23 @@ const getGameStatusMessage = (position: string) => {
   const chess = new Chess(position);
   
   if (chess.isCheckmate()) {
-    return `Checkmate! ${chess.turn() === 'w' ? 'Black' : 'White'} wins!`;
+    return { isGameOver: true, message: `Checkmate! ${chess.turn() === 'w' ? 'Black' : 'White'} wins!` };
   }
   
   if (chess.isDraw()) {
     if (chess.isStalemate()) {
-      return "Game Over - Stalemate!";
+      return { isGameOver: true, message: "Game Over - Stalemate!" };
     }
     if (chess.isThreefoldRepetition()) {
-      return "Game Over - Draw by threefold repetition!";
+      return { isGameOver: true, message: "Game Over - Draw by threefold repetition!" };
     }
     if (chess.isInsufficientMaterial()) {
-      return "Game Over - Draw by insufficient material!";
+      return { isGameOver: true, message: "Game Over - Draw by insufficient material!" };
     }
-    return "Game Over - Draw!";
+    return { isGameOver: true, message: "Game Over - Draw!" };
   }
   
-  return null;
+  return { isGameOver: false, message: null };
 };
 
 export const GameRoom: React.FC<GameRoomProps> = ({
@@ -345,32 +345,28 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       const result = chess.move({ from, to });
       if (result) {
         const updatedPosition = chess.fen();
-        const updatedMoveHistory = [...(localGameState.moveHistory || []), `${from}${to}`];
+        const updatedMoveHistory = [...(localGameState?.moveHistory || []), `${from}${to}`];
         
         // Check game ending conditions
         const gameStatus = getGameStatusMessage(updatedPosition);
-        if (gameStatus) {
-          setGameOverMessage(gameStatus);
+        
+        if (gameStatus.isGameOver) {
           setShowGameOverDialog(true);
-          // Update game state with status
-          const updatedGameState: GameState = {
-            ...localGameState,
-            position: updatedPosition,
-            moveHistory: updatedMoveHistory,
-            status: 'completed',
-            result: gameStatus
-          };
-          setLocalGameState(updatedGameState);
-        } else {
-          // Game continues
-          const updatedGameState: GameState = {
-            ...localGameState,
-            position: updatedPosition,
-            moveHistory: updatedMoveHistory,
-            turn: chess.turn()
-          };
-          setLocalGameState(updatedGameState);
+          setGameOverMessage(gameStatus.message);
         }
+        
+        // Update local state
+        if (localGameState) {
+          setLocalGameState({
+            ...localGameState,
+            position: updatedPosition,
+            moveHistory: updatedMoveHistory,
+            status: gameStatus.isGameOver ? 'completed' : 'active'
+          });
+        }
+
+        // Notify parent component
+        onMove(from, to);
       }
     } catch (error) {
       console.error('Invalid move:', error);
