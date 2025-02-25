@@ -344,21 +344,17 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   const handleGameCompletion = () => {
     if (!localGameState) return;
 
-    // Update game state
-    setLocalGameState({
+    // Update game state with all required properties
+    const updatedState: GameState = {
       ...localGameState,
       status: 'completed',
       result: gameOverMessage || 'Game Over',
       players: {
         white: localGameState.players.white || '',
         black: localGameState.players.black || ''
-      },
-      moveHistory: localGameState.moveHistory,
-      captures: localGameState.captures,
-      gameId: localGameState.gameId,
-      position: localGameState.position,
-      turn: localGameState.turn
-    });
+      }
+    };
+    setLocalGameState(updatedState);
 
     // Show game over dialog
     setShowGameOverDialog(true);
@@ -381,12 +377,14 @@ export const GameRoom: React.FC<GameRoomProps> = ({
           handleGameCompletion();
         } else {
           // Update local state for ongoing game
-          setLocalGameState({
+          const updatedState: GameState = {
             ...localGameState,
             position: updatedPosition,
             moveHistory: updatedMoveHistory,
-            turn: chess.turn() as 'w' | 'b'
-          });
+            turn: chess.turn() as 'w' | 'b',
+            status: 'active'
+          };
+          setLocalGameState(updatedState);
         }
 
         // Notify parent component
@@ -397,12 +395,25 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     }
   };
 
+  const handleJoinGame = (color: 'white' | 'black') => {
+    if (!localGameState) return;
+
+    const updatedState: GameState = {
+      ...localGameState,
+      players: {
+        ...localGameState.players,
+        [color]: '' // Removed playerId || ''
+      },
+      status: 'active'
+    };
+    setLocalGameState(updatedState);
+  };
+
   const handleCopyClick = () => {
-    navigator.clipboard.writeText(gameId).then(() => {
-      setShowCopiedTooltip(true);
-      // Reset the copied state after 2 seconds
-      setTimeout(() => setShowCopiedTooltip(false), 2000);
-    });
+    if (!localGameState) return;
+    navigator.clipboard.writeText(localGameState.gameId);
+    setShowCopiedTooltip(true);
+    setTimeout(() => setShowCopiedTooltip(false), 2000);
   };
 
   const handleReturnHome = () => {
@@ -419,10 +430,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       setGameOverMessage(`${resigningPlayer === 'white' ? 'White' : 'Black'} resigned. ${resigningPlayer === 'white' ? 'Black' : 'White'} wins!`);
       
       // Update game state
-      setLocalGameState(prev => ({
-        ...prev,
+      const updatedState: GameState = {
+        ...localGameState,
         status: 'completed'
-      }));
+      };
+      setLocalGameState(updatedState);
     }
   };
 
