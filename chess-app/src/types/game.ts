@@ -4,15 +4,15 @@ export interface GameState {
   status: 'waiting' | 'active' | 'completed';
   turn: 'w' | 'b';
   players: {
-    white: string | null;
-    black: string | null;
+    white: string;
+    black: string;
   };
   moveHistory: string[];
   captures: {
     white: string[];
     black: string[];
   };
-  result?: string;
+  result: string;
 }
 
 export interface Player {

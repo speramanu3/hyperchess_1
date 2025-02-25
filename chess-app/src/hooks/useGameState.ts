@@ -7,14 +7,15 @@ const initialState: GameState = {
   status: 'waiting',
   turn: 'w',
   players: {
-    white: null,
-    black: null
+    white: '',
+    black: ''
   },
   moveHistory: [],
   captures: {
     white: [],
     black: []
-  }
+  },
+  result: ''
 };
 
 export const useGameState = (wsState: WebSocketState) => {

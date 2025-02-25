@@ -344,10 +344,21 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   const handleGameOver = () => {
     if (!localGameState) return;
     
-    setLocalGameState({
+    const updatedState: GameState = {
       ...localGameState,
-      status: 'completed'
-    });
+      status: 'completed',
+      gameId: localGameState.gameId,
+      position: localGameState.position,
+      turn: localGameState.turn,
+      players: {
+        white: localGameState.players.white || '',
+        black: localGameState.players.black || ''
+      },
+      moveHistory: localGameState.moveHistory,
+      captures: localGameState.captures,
+      result: gameOverMessage || 'Game Over'
+    };
+    setLocalGameState(updatedState);
   };
 
   const handleMove = (from: string, to: string) => {
@@ -366,13 +377,21 @@ export const GameRoom: React.FC<GameRoomProps> = ({
           handleGameOver();
         } else {
           // Update local state for ongoing game
-          setLocalGameState({
+          const updatedState: GameState = {
             ...localGameState,
             position: updatedPosition,
             moveHistory: updatedMoveHistory,
             turn: chess.turn() as 'w' | 'b',
-            status: 'active'
-          });
+            status: 'active',
+            gameId: localGameState.gameId,
+            players: {
+              white: localGameState.players.white || '',
+              black: localGameState.players.black || ''
+            },
+            captures: localGameState.captures,
+            result: ''
+          };
+          setLocalGameState(updatedState);
         }
 
         // Notify parent component
