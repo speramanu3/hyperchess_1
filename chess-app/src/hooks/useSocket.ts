@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { GameState } from './useGameState';
 
 const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_SERVER_URL || 'ws://localhost:3002';
-
-interface GameState {
-  fen: string;
-  turn: string;
-  gameOver: boolean;
-}
 
 interface ServerEvent {
   type: 'gameState' | 'error' | 'ping';
@@ -61,13 +56,11 @@ export const useSocket = () => {
               setGameState(serverEvent.state);
             }
             break;
-          
           case 'error':
             if (serverEvent.message) {
               setError(serverEvent.message);
             }
             break;
-          
           case 'ping':
             const pong: GameEvent = { type: 'pong' };
             ws.send(JSON.stringify(pong));

@@ -1,33 +1,23 @@
-export type GameStatus = 'waiting' | 'active' | 'completed' | 'resigned';
+import { GameState } from '../hooks/useGameState';
 
-export interface GameState {
-  gameId: string;
-  position: string;
-  turn: 'w' | 'b';
-  status: GameStatus;
-  result?: string;
-  players: {
-    white: string | null;
-    black: string | null;
-  };
-  moveHistory?: string[];
-  captures?: {
-    white: string[];
-    black: string[];
-  };
-}
+export type { GameState };
 
 export interface GameMove {
   from: string;
   to: string;
 }
 
-export type GameResult = 
-  | 'Checkmate! White wins!'
-  | 'Checkmate! Black wins!'
-  | 'Draw by stalemate!'
-  | 'Draw by threefold repetition!'
-  | 'Draw by insufficient material!'
-  | 'Draw!'
-  | 'White resigned'
-  | 'Black resigned';
+export interface Player {
+  id: string;
+  name: string;
+}
+
+export interface GameRoom {
+  id: string;
+  players: {
+    white: Player | null;
+    black: Player | null;
+  };
+  spectators: Player[];
+  gameState: GameState;
+}
