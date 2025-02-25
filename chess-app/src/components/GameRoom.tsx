@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { 
   Box, 
   Button, 
@@ -17,13 +18,11 @@ import { GameState, GameMove } from '../types/game';
 import { Chess } from 'chess.js';
 import FileCopyIcon from '@mui/icons-material/FileCopy';
 import InfoIcon from '@mui/icons-material/Info';
+import { useSocket } from '../hooks/useSocket';
 
 interface GameRoomProps {
-  gameState: GameState;
-  onMove: (move: GameMove) => void;
   isWhitePlayer: boolean;
   isBlackPlayer: boolean;
-  socket: any;
   onLeaveGame: () => void; 
 }
 
@@ -303,14 +302,14 @@ const getGameStatusMessage = (position: string) => {
 };
 
 export const GameRoom: React.FC<GameRoomProps> = ({
-  gameState,
-  onMove,
   isWhitePlayer,
   isBlackPlayer,
-  socket,
   onLeaveGame
 }) => {
-  const chess = new Chess(gameState.position);
+  const { gameId = '' } = useParams<{ gameId: string }>();
+  const { isConnected, gameState, error, joinGame, makeMove } = useSocket();
+
+  const chess = new Chess(gameState?.position);
   const isGameOver = chess.isCheckmate() || chess.isDraw();
   const winner = chess.isCheckmate() 
     ? (chess.turn() === 'w' ? 'Black' : 'White') 
@@ -320,7 +319,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
 
   const [showGameOverDialog, setShowGameOverDialog] = React.useState(false);
   const [localGameState, setLocalGameState] = React.useState(gameState);
-  const [localGameId, setLocalGameId] = React.useState(gameState.gameId);
+  const [localGameId, setLocalGameId] = React.useState(gameId);
   const [capturedPieces, setCapturedPieces] = React.useState<{
     white: string[];
     black: string[];
@@ -332,111 +331,18 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   const [showCopiedTooltip, setShowCopiedTooltip] = React.useState(false);
   const [isGameOverState, setIsGameOver] = React.useState(isGameOver);
 
-  // Update local state when props change
   useEffect(() => {
-    console.log('Game state update - Turn:', localGameState.turn, 'Position:', localGameState.position);
-    setLocalGameState(gameState);
-    setLocalGameId(gameState.gameId);
-  }, [gameState]);
-
-  // Socket event handlers
-  useEffect(() => {
-    if (socket) {
-      socket.on('game_update', (data: any) => {
-        console.log('Received game update:', data);
-        
-        switch (data.type) {
-          case 'game_over':
-            if (data.gameStatus) {
-              setIsGameOver(true);
-              setShowGameOverDialog(true);
-              
-              if (data.gameStatus.type === 'checkmate' && data.gameStatus.winner) {
-                const winner = data.gameStatus.winner === 'white' ? 'White' : 'Black';
-                setGameOverMessage(`Checkmate! ${winner} wins!`);
-              } else if (data.gameStatus.type === 'draw') {
-                setGameOverMessage('Game Over - Draw!');
-              } else if (data.gameStatus.type === 'timeout') {
-                setGameOverMessage('Game Over - Time\'s up!');
-              }
-            }
-            break;
-
-          case 'resign':
-            if (data.player) {
-              setIsGameOver(true);
-              setShowGameOverDialog(true);
-              if ((data.player === 'white' && isWhitePlayer) || 
-                  (data.player === 'black' && isBlackPlayer)) {
-                setGameOverMessage(`You resigned. ${data.player === 'white' ? 'Black' : 'White'} wins!`);
-              } else {
-                setGameOverMessage(`${data.player === 'white' ? 'White' : 'Black'} resigned. You win!`);
-              }
-            }
-            break;
-        }
-      });
-
-      socket.on('moveMade', (data: any) => {
-        console.log('Move made with data:', data);
-        
-        // Update game state
-        setLocalGameState(prev => ({
-          ...prev,
-          position: data.position,
-          moveHistory: data.moveHistory || prev.moveHistory,
-          captures: data.captures || prev.captures
-        }));
-
-        // Update move history if provided
-        if (data.moveHistory) {
-          // Update move history state
-        }
-
-        // Update captures if provided
-        if (data.captures) {
-          setCapturedPieces(data.captures);
-        }
-
-        // Check for checkmate or draw
-        const chess = new Chess(data.position);
-        if (chess.isCheckmate() || chess.isDraw()) {
-          setIsGameOver(true);
-          setShowGameOverDialog(true);
-          if (chess.isCheckmate()) {
-            const winner = chess.turn() === 'w' ? 'Black' : 'White';
-            setGameOverMessage(`Checkmate! ${winner} wins!`);
-          } else {
-            setGameOverMessage('Game Over - Draw!');
-          }
-        }
-      });
-
-      return () => {
-        socket.off('game_update');
-        socket.off('moveMade');
-      };
+    if (isConnected && gameId) {
+      joinGame(gameId);
     }
-  }, [socket, isWhitePlayer, isBlackPlayer]);
+  }, [isConnected, gameId, joinGame]);
 
-  // Initialize move history from game state
   useEffect(() => {
-    console.log('Game state updated:', localGameState);
-    if (localGameState.moveHistory && localGameState.moveHistory.length > 0) {
-      console.log('Setting move history from game state:', localGameState.moveHistory);
-      // Update move history state
-    } else {
-      try {
-        // Fallback to calculating moves if server doesn't provide them
-        const newChess = new Chess(localGameState.position);
-        const moves = newChess.history();
-        console.log('Calculated move history:', moves);
-        // Update move history state
-      } catch (error) {
-        console.error('Error updating move history:', error);
-      }
+    if (gameState) {
+      setLocalGameState(gameState);
+      setLocalGameId(gameId);
     }
-  }, [localGameState]);
+  }, [gameState, gameId]);
 
   const handleMove = (from: string, to: string) => {
     try {
@@ -459,7 +365,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             result: gameStatus
           };
           setLocalGameState(updatedGameState);
-          onMove?.({ from, to });
+          makeMove(gameId, `${from}${to}`);
         } else {
           // Game continues
           const updatedGameState: GameState = {
@@ -469,7 +375,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             turn: chess.turn()
           };
           setLocalGameState(updatedGameState);
-          onMove?.({ from, to });
+          makeMove(gameId, `${from}${to}`);
         }
       }
     } catch (error) {
@@ -486,26 +392,13 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   };
 
   const handleReturnHome = () => {
-    if (socket) {
-      socket.emit('game_action', { 
-        type: 'leave_game',
-        gameId: gameState.gameId,
-        player: isWhitePlayer ? 'white' : 'black'
-      });
-    }
     onLeaveGame();
   };
 
   const handleResign = () => {
-    if (socket && (isWhitePlayer || isBlackPlayer)) {
+    if (isConnected && (isWhitePlayer || isBlackPlayer)) {
       const resigningPlayer = isWhitePlayer ? 'white' : 'black';
       
-      socket.emit('game_action', { 
-        type: 'resign',
-        gameId: gameState.gameId,
-        player: resigningPlayer
-      });
-
       // Update local state immediately to show game over
       setIsGameOver(true);
       setShowGameOverDialog(true);
@@ -646,6 +539,18 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   const handleCloseGameOver = () => {
     setShowGameOverDialog(false);
   };
+
+  if (error) {
+    return <div className="text-red-500">Error: {error}</div>;
+  }
+
+  if (!isConnected) {
+    return <div>Connecting to game...</div>;
+  }
+
+  if (!gameState) {
+    return <div>Loading game state...</div>;
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', p: 4 }}>
