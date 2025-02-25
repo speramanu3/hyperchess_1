@@ -11,7 +11,12 @@ app.use(cors());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: [
+      "http://localhost:3000",
+      "https://hyperchess-1.vercel.app",
+      "https://hyperchess-1-git-main-speramanu3.vercel.app",
+      "https://hyperchess-1-speramanu3.vercel.app"
+    ],
     methods: ["GET", "POST"],
     allowedHeaders: ["my-custom-header"],
     credentials: true
@@ -341,84 +346,6 @@ io.on('connection', (socket) => {
         });
       }
 
-=======
-      const move = chess.move({ from, to });
-
-      if (move) {
-        const newPosition = chess.fen();
-        
-        // Initialize or update position history
-        if (!game.positionHistory) {
-          game.positionHistory = [game.position];
-        }
-        game.positionHistory.push(newPosition);
-
-        // Check for threefold repetition
-        const positions = game.positionHistory.map(fen => {
-          const fenParts = fen.split(' ');
-          return fenParts.slice(0, 4).join(' ');
-        });
-
-        const isThreefoldRepetition = positions.some(pos => {
-          return positions.filter(p => p === pos).length >= 3;
-        });
-
-        // Update game state
-        game.position = newPosition;
-        game.turn = chess.turn();
-        game.lastActivityTime = Date.now();
-
-        if (!game.moveHistory) {
-          game.moveHistory = [];
-        }
-        game.moveHistory.push(`${from}${to}`);
-
-        // Check game ending conditions
-        let gameStatus = null;
-
-        // Create a new Chess instance for validation to ensure fresh state
-        const validator = new Chess(newPosition);
-        
-        if (validator.isCheckmate()) {
-          gameStatus = {
-            type: 'checkmate',
-            winner: validator.turn() === 'w' ? 'black' : 'white'
-          };
-          game.status = 'completed';
-        } else if (validator.isStalemate()) {
-          gameStatus = {
-            type: 'draw',
-            reason: 'stalemate'
-          };
-          game.status = 'completed';
-        } else if (validator.isInsufficientMaterial()) {
-          gameStatus = {
-            type: 'draw',
-            reason: 'insufficient'
-          };
-          game.status = 'completed';
-        } else if (isThreefoldRepetition) {
-          gameStatus = {
-            type: 'draw',
-            reason: 'threefold'
-          };
-          game.status = 'completed';
-        }
-
-        // Broadcast the move and game status
-        io.to(gameId).emit('moveMade', {
-          from,
-          to,
-          position: newPosition,
-          turn: validator.turn(),
-          moveHistory: game.moveHistory,
-          gameStatus
-        });
-
-        games.set(gameId, game);
-      } else {
-        socket.emit('error', 'Invalid move');
-      }
 >>>>>>> Stashed changes
     } catch (error) {
       console.error('Error making move:', error);
