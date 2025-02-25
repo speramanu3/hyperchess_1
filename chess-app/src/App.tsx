@@ -30,13 +30,13 @@ function App() {
   };
 
   const handleLeaveGame = () => {
-    if (wsState && gameState?.gameId) {
-      wsState.makeMove(gameState.gameId, 'leave');
+    if (gameState?.gameId) {
+      wsState.leaveGame(gameState.gameId);
     }
   };
 
-  const isWhitePlayer = wsState?.id === gameState?.players.white;
-  const isBlackPlayer = wsState?.id === gameState?.players.black;
+  const isWhitePlayer = wsState?.id === gameState?.players?.white;
+  const isBlackPlayer = wsState?.id === gameState?.players?.black;
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -50,7 +50,7 @@ function App() {
         {gameState ? (
           <GameRoom
             gameState={gameState}
-            onMove={(from, to) => makeMove(from, to)}
+            onMove={makeMove}
             gameId={gameId}
             isConnected={wsState.isConnected}
             error={error || wsState.error || gameError}

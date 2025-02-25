@@ -21,10 +21,14 @@ import InfoIcon from '@mui/icons-material/Info';
 import { useSocket } from '../hooks/useSocket';
 
 interface GameRoomProps {
+  gameState: GameState;
+  onMove: (from: string, to: string) => void;
+  gameId: string;
+  isConnected: boolean;
+  error: string | null;
   isWhitePlayer: boolean;
   isBlackPlayer: boolean;
-  onLeaveGame: () => void; 
-  onMove: (move: GameMove) => void;
+  onLeaveGame: () => void;
 }
 
 interface GameUpdateData {
@@ -49,8 +53,6 @@ const GameRoomContainer = styled(Box)(({ theme }) => ({
   alignItems: 'center',
   padding: theme.spacing(3),
   height: '100vh',
-  backgroundColor: theme.palette.background.default,
-  color: theme.palette.text.primary,
 }));
 
 const GameLayout = styled('div')({
@@ -302,13 +304,19 @@ const getGameStatusMessage = (position: string) => {
   return null;
 };
 
-export const GameRoom: React.FC = () => {
-  const wsState = useSocket();
-  const { gameState } = wsState;
-  const { gameId = '' } = useParams<{ gameId: string }>();
+export const GameRoom: React.FC<GameRoomProps> = ({
+  gameState,
+  onMove,
+  gameId,
+  isConnected,
+  error,
+  isWhitePlayer,
+  isBlackPlayer,
+  onLeaveGame
+}) => {
   const [showGameOverDialog, setShowGameOverDialog] = React.useState(false);
-  const [localGameState, setLocalGameState] = React.useState(gameState);
-  const [localGameId, setLocalGameId] = React.useState(gameId);
+  const [localGameState, setLocalGameState] = React.useState<GameState>(gameState);
+  const [gameOverMessage, setGameOverMessage] = React.useState('');
   const [capturedPieces, setCapturedPieces] = React.useState<{
     white: string[];
     black: string[];
@@ -316,22 +324,12 @@ export const GameRoom: React.FC = () => {
     white: [],
     black: []
   });
-  const [gameOverMessage, setGameOverMessage] = React.useState('');
   const [showCopiedTooltip, setShowCopiedTooltip] = React.useState(false);
   const [isGameOverState, setIsGameOver] = React.useState(false);
 
   useEffect(() => {
-    if (wsState.isConnected && gameId) {
-      wsState.joinGame(gameId);
-    }
-  }, [wsState.isConnected, gameId, wsState.joinGame]);
-
-  useEffect(() => {
-    if (gameState) {
-      setLocalGameState(gameState);
-      setLocalGameId(gameId);
-    }
-  }, [gameState, gameId]);
+    setLocalGameState(gameState);
+  }, [gameState]);
 
   const chess = new Chess(localGameState?.position);
   const isGameOver = chess.isCheckmate() || chess.isDraw();
@@ -340,9 +338,6 @@ export const GameRoom: React.FC = () => {
     : chess.isDraw() 
     ? 'Draw' 
     : null;
-
-  const isWhitePlayer = wsState.id === localGameState?.players?.white;
-  const isBlackPlayer = wsState.id === localGameState?.players?.black;
 
   const handleMove = (from: string, to: string) => {
     try {
@@ -382,7 +377,7 @@ export const GameRoom: React.FC = () => {
   };
 
   const handleCopyClick = () => {
-    navigator.clipboard.writeText(localGameId).then(() => {
+    navigator.clipboard.writeText(gameId).then(() => {
       setShowCopiedTooltip(true);
       // Reset the copied state after 2 seconds
       setTimeout(() => setShowCopiedTooltip(false), 2000);
@@ -390,11 +385,11 @@ export const GameRoom: React.FC = () => {
   };
 
   const handleReturnHome = () => {
-    wsState.onLeaveGame();
+    onLeaveGame();
   };
 
   const handleResign = () => {
-    if (wsState.isConnected && (isWhitePlayer || isBlackPlayer)) {
+    if (isConnected && (isWhitePlayer || isBlackPlayer)) {
       const resigningPlayer = isWhitePlayer ? 'white' : 'black';
       
       // Update local state immediately to show game over
@@ -538,20 +533,20 @@ export const GameRoom: React.FC = () => {
     setShowGameOverDialog(false);
   };
 
-  if (wsState.error) {
-    return <div className="text-red-500">Error: {wsState.error}</div>;
+  if (error) {
+    return <div className="text-red-500">Error: {error}</div>;
   }
 
-  if (!wsState.isConnected) {
+  if (!isConnected) {
     return <div>Connecting to game...</div>;
   }
 
-  if (!gameState) {
+  if (!localGameState) {
     return <div>Loading game state...</div>;
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', p: 4 }}>
+    <GameRoomContainer>
       <GameLayout>
         {/* Left Side */}
         <SidePanel>
@@ -565,7 +560,7 @@ export const GameRoom: React.FC = () => {
                 lineHeight: 1.5  
               }}
             >
-              Game ID: {localGameId?.substring(0, 8)}
+              Game ID: {gameId?.substring(0, 8)}
             </Typography>
             <Tooltip title={showCopiedTooltip ? "Copied!" : "Copy Game ID"}>
               <IconButton size="small" onClick={handleCopyClick}>
@@ -727,6 +722,6 @@ export const GameRoom: React.FC = () => {
           </Button>
         </StyledDialogActions>
       </StyledDialog>
-    </Box>
+    </GameRoomContainer>
   );
 };
