@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { GameState } from './useGameState';
+import { GameState, WebSocketState } from '../types/game';
 
 const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_SERVER_URL || 'ws://localhost:3002';
 
@@ -17,7 +17,7 @@ interface GameEvent {
   move?: string;
 }
 
-export const useSocket = () => {
+export const useSocket = (): WebSocketState => {
   const [isConnected, setIsConnected] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +40,6 @@ export const useSocket = () => {
       console.log('WebSocket disconnected');
       setIsConnected(false);
       setId(null);
-      // Attempt to reconnect after 1 second
       setTimeout(connect, 1000);
     };
 

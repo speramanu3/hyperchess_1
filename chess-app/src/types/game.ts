@@ -9,15 +9,13 @@ export interface GameState {
     black: string | null;
   };
   moveHistory: string[];
-  status: 'active' | 'completed';
+  status: 'waiting' | 'active' | 'completed';
   result?: string;
   captures: {
     white: string[];
     black: string[];
   };
 }
-
-export type { GameState };
 
 export interface GameMove {
   from: string;
@@ -39,4 +37,14 @@ export interface GameRoom {
   };
   spectators: Player[];
   gameState: GameState;
+}
+
+export interface WebSocketState {
+  isConnected: boolean;
+  gameState: GameState | null;
+  error: string | null;
+  id: string | null;
+  joinGame: (gameId: string) => void;
+  makeMove: (gameId: string, move: string) => void;
+  leaveGame: (gameId: string) => void;
 }
