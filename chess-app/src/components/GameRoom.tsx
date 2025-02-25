@@ -341,12 +341,21 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     ? 'Draw' 
     : null;
 
+  const handleGameOver = () => {
+    if (!localGameState) return;
+    
+    setLocalGameState({
+      ...localGameState,
+      status: 'completed'
+    });
+  };
+
   const handleMove = (from: string, to: string) => {
     try {
       const result = chess.move({ from, to });
-      if (result) {
+      if (result && localGameState) {
         const updatedPosition = chess.fen();
-        const updatedMoveHistory = [...(localGameState?.moveHistory || []), `${from}${to}`];
+        const updatedMoveHistory = [...(localGameState.moveHistory || []), `${from}${to}`];
         
         // Check game ending conditions
         const gameStatus = getGameStatusMessage(updatedPosition);
@@ -354,15 +363,15 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         if (gameStatus.isGameOver && gameStatus.message) {
           setShowGameOverDialog(true);
           setGameOverMessage(gameStatus.message);
-        }
-        
-        // Update local state
-        if (localGameState) {
+          handleGameOver();
+        } else {
+          // Update local state for ongoing game
           setLocalGameState({
             ...localGameState,
             position: updatedPosition,
             moveHistory: updatedMoveHistory,
-            status: gameStatus.isGameOver ? 'completed' : 'active'
+            turn: chess.turn() as 'w' | 'b',
+            status: 'active'
           });
         }
 
