@@ -98,22 +98,30 @@ const MoveList = styled(Box)({
   color: '#B4B4B4',
 });
 
-const MovePair = styled('div')({
-  marginBottom: '4px',
-  '&:last-child': {
-    marginBottom: 0
-  }
+const MoveRow = styled('div')({
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '4px 8px',
+  fontSize: '14px',
+  '&:nth-of-type(odd)': {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  '&:hover': {
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
+});
+
+const MoveNumber = styled('span')({
+  minWidth: '30px',
+  display: 'inline-block',
+  color: '#6B8DA5',
 });
 
 const MoveItem = styled('span')({
   display: 'inline-block',
   marginRight: '5px',
   fontFamily: '"Courier New", monospace',
-  '& .move-number': {
-    color: '#6B8DA5',
-    minWidth: '30px',
-    display: 'inline-block'
-  },
 });
 
 const LeaveGameButton = styled(Button)({
@@ -551,19 +559,20 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     return (
       <MoveHistory>
         <MoveList>
-          {localGameState.moveHistory && Array.from({ length: Math.ceil(localGameState.moveHistory.length / 2) }, (_, i) => {
-            const whiteMove = localGameState.moveHistory?.[i * 2];
-            const blackMove = localGameState.moveHistory?.[i * 2 + 1];
-            return (
-              <MovePair key={i}>
-                <MoveItem>
-                  <span className="move-number">{i + 1}.</span>
-                  {whiteMove}
-                  {blackMove && <span style={{ marginLeft: '8px' }}>{blackMove}</span>}
-                </MoveItem>
-              </MovePair>
-            );
-          })}
+          {localGameState?.moveHistory ? Array.from(
+            { length: Math.ceil(localGameState.moveHistory.length / 2) },
+            (_, i) => {
+              const whiteMove = localGameState.moveHistory[i * 2];
+              const blackMove = localGameState.moveHistory[i * 2 + 1];
+              return (
+                <MoveRow key={i}>
+                  <MoveNumber>{i + 1}.</MoveNumber>
+                  <Move>{whiteMove}</Move>
+                  {blackMove && <Move>{blackMove}</Move>}
+                </MoveRow>
+              );
+            }
+          ) : null}
         </MoveList>
       </MoveHistory>
     );
@@ -600,11 +609,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({
                 lineHeight: 1.5  
               }}
             >
-              Game ID: {gameId?.substring(0, 8)}
+              Game ID: {localGameState?.gameId?.substring(0, 8)}
             </Typography>
             <Tooltip title={showCopiedTooltip ? "Copied!" : "Copy Game ID"}>
               <IconButton size="small" onClick={() => {
-                if (!localGameState) return;
+                if (!localGameState?.gameId) return;
                 navigator.clipboard.writeText(localGameState.gameId);
                 setShowCopiedTooltip(true);
                 setTimeout(() => setShowCopiedTooltip(false), 2000);
@@ -639,16 +648,18 @@ export const GameRoom: React.FC<GameRoomProps> = ({
             }}
           >
             <Typography variant="body1" sx={{ color: '#86c1b9' }}>
-              {localGameState.turn === 'w' ? "White's turn" : "Black's turn"}
+              {localGameState?.turn === 'w' ? "White's turn" : "Black's turn"}
             </Typography>
           </Paper>
 
-          <ChessBoard
-            fen={localGameState.position}
-            onMove={handleMove}
-            isWhitePlayer={isWhitePlayer}
-            isBlackPlayer={isBlackPlayer}
-          />
+          {localGameState && (
+            <ChessBoard
+              fen={localGameState.position}
+              onMove={handleMove}
+              isWhitePlayer={isWhitePlayer}
+              isBlackPlayer={isBlackPlayer}
+            />
+          )}
 
           <Typography
             variant="body2"
@@ -678,7 +689,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
           >
             leave game
           </Button>
-          {(isWhitePlayer || isBlackPlayer) && localGameState.status === 'active' && (
+          {(isWhitePlayer || isBlackPlayer) && localGameState?.status === 'active' && (
             <Button
               variant="outlined"
               onClick={handleResign}
