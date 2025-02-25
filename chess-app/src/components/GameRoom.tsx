@@ -451,13 +451,15 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   };
 
   useEffect(() => {
+    if (!localGameState) return;
+
     const chess = new Chess(localGameState.position);
     const newCapturedPieces = getCapturedPieces(chess);
     setCapturedPieces(newCapturedPieces);
-  }, [localGameState.position]);
+  }, [localGameState?.position]);
 
   const getCapturedPieces = (chess: Chess) => {
-    const currentPieces: { [key: string]: number } = {
+    const currentPieces = {
       p_w: 0, p_b: 0,  // pawns
       n_w: 0, n_b: 0,  // knights
       b_w: 0, b_b: 0,  // bishops
@@ -469,8 +471,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       if (!row) return;
       row.forEach(piece => {
         if (piece) {
-          const key = `${piece.type}_${piece.color}`;
-          currentPieces[key] = (currentPieces[key] || 0) + 1;
+          currentPieces[`${piece.type}_${piece.color}` as keyof typeof currentPieces]++;
         }
       });
     });
@@ -488,22 +489,21 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       black: [] as string[]
     };
 
-    Object.entries(initialPieces).forEach(([piece, count]) => {
-      const currentCount = currentPieces[piece] || 0;
-      const captured = count - currentCount;
-      const [type, color] = piece.split('_');
+    Object.entries(initialPieces).forEach(([key, count]) => {
+      const [type, color] = key.split('_');
+      const diff = count - currentPieces[key as keyof typeof currentPieces];
       
-      for (let i = 0; i < captured; i++) {
+      for (let i = 0; i < diff; i++) {
         if (color === 'w') {
-          capturedPieces.black.push(piece);
+          capturedPieces.black.push(`${type}_${color}`);
         } else {
-          capturedPieces.white.push(piece);
+          capturedPieces.white.push(`${type}_${color}`);
         }
       }
     });
 
-    capturedPieces.white.sort((a, b) => getPieceValue(b.split('_')[0] as string) - getPieceValue(a.split('_')[0] as string));
-    capturedPieces.black.sort((a, b) => getPieceValue(b.split('_')[0] as string) - getPieceValue(a.split('_')[0] as string));
+    capturedPieces.white.sort((a, b) => getPieceValue(b.split('_')[0]) - getPieceValue(a.split('_')[0]));
+    capturedPieces.black.sort((a, b) => getPieceValue(b.split('_')[0]) - getPieceValue(a.split('_')[0]));
 
     return capturedPieces;
   };
