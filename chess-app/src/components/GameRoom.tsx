@@ -346,13 +346,17 @@ export const GameRoom: React.FC<GameRoomProps> = ({
 
     // Update game state with all required properties
     const updatedState: GameState = {
-      ...localGameState,
+      gameId: localGameState.gameId,
+      position: localGameState.position,
       status: 'completed',
-      result: gameOverMessage || 'Game Over',
+      turn: localGameState.turn,
       players: {
         white: localGameState.players.white || '',
         black: localGameState.players.black || ''
-      }
+      },
+      moveHistory: localGameState.moveHistory,
+      captures: localGameState.captures,
+      result: gameOverMessage || 'Game Over'
     };
     setLocalGameState(updatedState);
 
@@ -378,11 +382,14 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         } else {
           // Update local state for ongoing game
           const updatedState: GameState = {
-            ...localGameState,
+            gameId: localGameState.gameId,
             position: updatedPosition,
-            moveHistory: updatedMoveHistory,
+            status: 'active',
             turn: chess.turn() as 'w' | 'b',
-            status: 'active'
+            players: localGameState.players,
+            moveHistory: updatedMoveHistory,
+            captures: localGameState.captures,
+            result: localGameState.result
           };
           setLocalGameState(updatedState);
         }
@@ -399,42 +406,40 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     if (!localGameState) return;
 
     const updatedState: GameState = {
-      ...localGameState,
+      gameId: localGameState.gameId,
+      position: localGameState.position,
+      status: 'active',
+      turn: localGameState.turn,
       players: {
         ...localGameState.players,
-        [color]: '' // Removed playerId || ''
+        [color]: ''
       },
-      status: 'active'
+      moveHistory: localGameState.moveHistory,
+      captures: localGameState.captures,
+      result: localGameState.result
     };
     setLocalGameState(updatedState);
-  };
-
-  const handleCopyClick = () => {
-    if (!localGameState) return;
-    navigator.clipboard.writeText(localGameState.gameId);
-    setShowCopiedTooltip(true);
-    setTimeout(() => setShowCopiedTooltip(false), 2000);
-  };
-
-  const handleReturnHome = () => {
-    onLeaveGame();
   };
 
   const handleResign = () => {
     if (isConnected && (isWhitePlayer || isBlackPlayer)) {
       const resigningPlayer = isWhitePlayer ? 'white' : 'black';
       
-      // Update local state immediately to show game over
-      setIsGameOver(true);
-      setShowGameOverDialog(true);
-      setGameOverMessage(`${resigningPlayer === 'white' ? 'White' : 'Black'} resigned. ${resigningPlayer === 'white' ? 'Black' : 'White'} wins!`);
-      
       // Update game state
       const updatedState: GameState = {
-        ...localGameState,
-        status: 'completed'
+        gameId: localGameState.gameId,
+        position: localGameState.position,
+        status: 'completed',
+        turn: localGameState.turn,
+        players: localGameState.players,
+        moveHistory: localGameState.moveHistory,
+        captures: localGameState.captures,
+        result: `${resigningPlayer === 'white' ? 'Black' : 'White'} wins by resignation`
       };
       setLocalGameState(updatedState);
+      
+      setGameOverMessage(`${resigningPlayer === 'white' ? 'White' : 'Black'} resigned. ${resigningPlayer === 'white' ? 'Black' : 'White'} wins!`);
+      setShowGameOverDialog(true);
     }
   };
 
@@ -596,7 +601,12 @@ export const GameRoom: React.FC<GameRoomProps> = ({
               Game ID: {gameId?.substring(0, 8)}
             </Typography>
             <Tooltip title={showCopiedTooltip ? "Copied!" : "Copy Game ID"}>
-              <IconButton size="small" onClick={handleCopyClick}>
+              <IconButton size="small" onClick={() => {
+                if (!localGameState) return;
+                navigator.clipboard.writeText(localGameState.gameId);
+                setShowCopiedTooltip(true);
+                setTimeout(() => setShowCopiedTooltip(false), 2000);
+              }}>
                 <FileCopyIcon sx={{ color: '#86c1b9', fontSize: '1.2rem' }} />
               </IconButton>
             </Tooltip>
