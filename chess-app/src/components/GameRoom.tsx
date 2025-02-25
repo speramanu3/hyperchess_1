@@ -82,65 +82,76 @@ const SidePanel = styled('div')({
   margin: 0
 });
 
-const MoveHistory = styled(Box)({
-  marginTop: '20px',
-  padding: '12px',
-  background: '#2A2A2A',
-  borderRadius: '8px',
-  maxHeight: '200px',
+const MoveHistory = styled('div')({
+  flex: 1,
   overflowY: 'auto',
-  border: '1px solid #3A3A3A'
+  backgroundColor: '#FFFFFF',
+  borderRadius: '4px',
+  padding: '8px',
+  marginTop: '16px'
 });
 
-const MoveList = styled(Box)({
-  fontFamily: '"Courier New", monospace',
-  lineHeight: '1.8',
-  color: '#B4B4B4',
+const MoveList = styled('div')({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px'
 });
 
 const MoveRow = styled('div')({
   display: 'flex',
-  justifyContent: 'space-between',
   alignItems: 'center',
+  gap: '8px',
   padding: '4px 8px',
-  fontSize: '14px',
   '&:nth-of-type(odd)': {
     backgroundColor: 'rgba(0, 0, 0, 0.05)',
   },
   '&:hover': {
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
-  },
+  }
 });
 
 const MoveNumber = styled('span')({
-  minWidth: '30px',
-  display: 'inline-block',
   color: '#6B8DA5',
+  minWidth: '30px',
+  fontFamily: '"Courier New", monospace'
 });
 
-const MoveItem = styled('span')({
-  display: 'inline-block',
-  marginRight: '5px',
+const Move = styled('span')({
   fontFamily: '"Courier New", monospace',
-});
-
-const LeaveGameButton = styled(Button)({
-  color: '#4ECCA3',
-  borderColor: '#4ECCA3',
+  color: '#4A4A4A',
+  padding: '2px 4px',
+  borderRadius: '2px',
   '&:hover': {
-    borderColor: '#45B393',
-    backgroundColor: 'rgba(78, 204, 163, 0.1)'
+    backgroundColor: 'rgba(134, 193, 185, 0.2)'
   }
 });
 
-const ResignButton = styled(Button)({
-  color: '#FF6B6B',
-  borderColor: '#FF6B6B',
-  marginTop: '10px',
-  '&:hover': {
-    borderColor: '#FF5252',
-    backgroundColor: 'rgba(255, 107, 107, 0.1)'
+const PlayerInfo = styled('div')({
+  marginBottom: '24px'
+});
+
+const CapturedPieces = styled('div')({
+  marginBottom: '24px'
+});
+
+const GameContent = styled('div')({
+  display: 'flex',
+  gap: '24px',
+  padding: '16px',
+  '@media (max-width: 768px)': {
+    flexDirection: 'column'
   }
+});
+
+const BoardContainer = styled('div')({
+  flex: '0 0 auto'
+});
+
+const GameHeader = styled('div')({
+  display: 'flex',
+  alignItems: 'center',
+  padding: '16px',
+  borderBottom: '1px solid #E0E0E0'
 });
 
 const CapturedPiecesContainer = styled(Paper)(({ theme }) => ({
@@ -207,19 +218,6 @@ const MoveEntry = styled(Box)({
   },
 });
 
-const GameHeader = styled('div')({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '14px 16px',
-  backgroundColor: '#2c2c2c',
-  borderRadius: '4px',
-  marginBottom: '0.5rem',
-  width: '300px',
-  height: '52px', 
-  boxSizing: 'border-box'
-});
-
 const StyledDialog = styled(Dialog)({
   '& .MuiDialog-paper': {
     backgroundColor: '#2c2c2c',
@@ -246,6 +244,25 @@ const StyledDialogActions = styled(DialogActions)({
   display: 'flex',
   justifyContent: 'center',
   gap: '1rem'
+});
+
+const LeaveGameButton = styled(Button)({
+  color: '#4ECCA3',
+  borderColor: '#4ECCA3',
+  '&:hover': {
+    borderColor: '#45B393',
+    backgroundColor: 'rgba(78, 204, 163, 0.1)'
+  }
+});
+
+const ResignButton = styled(Button)({
+  color: '#FF6B6B',
+  borderColor: '#FF6B6B',
+  marginTop: '10px',
+  '&:hover': {
+    borderColor: '#FF5252',
+    backgroundColor: 'rgba(255, 107, 107, 0.1)'
+  }
 });
 
 const getPieceValue = (piece: string): number => {
