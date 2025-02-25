@@ -341,57 +341,52 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     ? 'Draw' 
     : null;
 
-  const handleGameOver = () => {
+  const handleGameCompletion = () => {
     if (!localGameState) return;
-    
-    const updatedState: GameState = {
+
+    // Update game state
+    setLocalGameState({
       ...localGameState,
       status: 'completed',
-      gameId: localGameState.gameId,
-      position: localGameState.position,
-      turn: localGameState.turn,
+      result: gameOverMessage || 'Game Over',
       players: {
         white: localGameState.players.white || '',
         black: localGameState.players.black || ''
       },
       moveHistory: localGameState.moveHistory,
       captures: localGameState.captures,
-      result: gameOverMessage || 'Game Over'
-    };
-    setLocalGameState(updatedState);
+      gameId: localGameState.gameId,
+      position: localGameState.position,
+      turn: localGameState.turn
+    });
+
+    // Show game over dialog
+    setShowGameOverDialog(true);
   };
 
   const handleMove = (from: string, to: string) => {
+    if (!localGameState) return;
+
     try {
       const result = chess.move({ from, to });
-      if (result && localGameState) {
+      if (result) {
         const updatedPosition = chess.fen();
-        const updatedMoveHistory = [...(localGameState.moveHistory || []), `${from}${to}`];
+        const updatedMoveHistory = [...localGameState.moveHistory, `${from}${to}`];
         
         // Check game ending conditions
         const gameStatus = getGameStatusMessage(updatedPosition);
         
         if (gameStatus.isGameOver && gameStatus.message) {
-          setShowGameOverDialog(true);
           setGameOverMessage(gameStatus.message);
-          handleGameOver();
+          handleGameCompletion();
         } else {
           // Update local state for ongoing game
-          const updatedState: GameState = {
+          setLocalGameState({
             ...localGameState,
             position: updatedPosition,
             moveHistory: updatedMoveHistory,
-            turn: chess.turn() as 'w' | 'b',
-            status: 'active',
-            gameId: localGameState.gameId,
-            players: {
-              white: localGameState.players.white || '',
-              black: localGameState.players.black || ''
-            },
-            captures: localGameState.captures,
-            result: ''
-          };
-          setLocalGameState(updatedState);
+            turn: chess.turn() as 'w' | 'b'
+          });
         }
 
         // Notify parent component
