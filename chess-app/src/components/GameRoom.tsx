@@ -315,8 +315,8 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   onLeaveGame
 }) => {
   const [showGameOverDialog, setShowGameOverDialog] = React.useState(false);
+  const [gameOverMessage, setGameOverMessage] = React.useState<string | null>(null);
   const [localGameState, setLocalGameState] = React.useState<GameState | null>(gameState);
-  const [gameOverMessage, setGameOverMessage] = React.useState('');
   const [capturedPieces, setCapturedPieces] = React.useState<{
     white: string[];
     black: string[];
@@ -350,7 +350,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
         // Check game ending conditions
         const gameStatus = getGameStatusMessage(updatedPosition);
         
-        if (gameStatus.isGameOver) {
+        if (gameStatus.isGameOver && gameStatus.message) {
           setShowGameOverDialog(true);
           setGameOverMessage(gameStatus.message);
         }
@@ -650,46 +650,19 @@ export const GameRoom: React.FC<GameRoomProps> = ({
       </GameLayout>
 
       {/* Game Over Dialog */}
-      <StyledDialog 
-        open={showGameOverDialog} 
-        onClose={handleCloseGameOver}
-      >
-        <StyledDialogTitle>
-          Game Over
-        </StyledDialogTitle>
-        <StyledDialogContent>
-          {gameOverMessage}
-        </StyledDialogContent>
-        <StyledDialogActions>
-          <Button
-            variant="contained"
-            onClick={handleReturnHome}
-            sx={{
-              backgroundColor: '#86c1b9',
-              color: '#1a1a1a',
-              '&:hover': {
-                backgroundColor: '#69958f'
-              }
-            }}
-          >
-            RETURN TO HOME
+      <Dialog open={showGameOverDialog} onClose={() => setShowGameOverDialog(false)}>
+        <DialogTitle>Game Over</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {gameOverMessage || 'The game has ended.'}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowGameOverDialog(false)} color="primary">
+            Close
           </Button>
-          <Button
-            variant="outlined"
-            onClick={handleCloseGameOver}
-            sx={{
-              color: '#86c1b9',
-              borderColor: '#86c1b9',
-              '&:hover': {
-                borderColor: '#86c1b9',
-                backgroundColor: 'rgba(134, 193, 185, 0.1)'
-              },
-            }}
-          >
-            STAY IN GAME ROOM
-          </Button>
-        </StyledDialogActions>
-      </StyledDialog>
+        </DialogActions>
+      </Dialog>
 
       {/* Rematch Dialog */}
       <StyledDialog
