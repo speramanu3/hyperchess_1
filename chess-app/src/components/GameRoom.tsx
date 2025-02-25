@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
