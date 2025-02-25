@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Chess } from 'chess.js';
 
 export interface GameState {
@@ -44,20 +44,25 @@ const initialState: GameState = {
 };
 
 export const useGameState = (wsState: WebSocketState) => {
-  const [gameState, setGameState] = useState<GameState>(initialState);
+  const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (wsState.gameState) {
+      setGameState(wsState.gameState);
+    }
+  }, [wsState.gameState]);
+
   const makeMove: MakeMove = (from: string, to: string) => {
-    if (!wsState.isConnected) {
-      setError('Not connected to server');
+    if (!gameState) {
+      setError('No active game');
       return;
     }
-
-    wsState.makeMove(gameState.gameId, `${from}${to}`);
+    wsState.makeMove(gameState.gameId, `${from}:${to}`);
   };
 
   return {
-    gameState: wsState.gameState || initialState,
+    gameState: gameState || initialState,
     makeMove,
     error: error || wsState.error
   };
