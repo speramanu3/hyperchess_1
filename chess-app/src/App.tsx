@@ -10,27 +10,28 @@ function App() {
   const wsState = useSocket();
   const { gameState, makeMove, error: gameError } = useGameState(wsState);
   const [gameId, setGameId] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleCreateGame = () => {
-    if (!wsState) {
-      wsState?.setError('Unable to connect to server');
+    if (!wsState.isConnected) {
+      setError('Unable to connect to server');
       return;
     }
-    wsState.emit('createGame');
+    wsState.makeMove('', 'create');
   };
 
   const handleJoinGame = (id: string) => {
-    if (!wsState) {
-      wsState?.setError('Unable to connect to server');
+    if (!wsState.isConnected) {
+      setError('Unable to connect to server');
       return;
     }
     setGameId(id);
-    wsState.emit('joinGame', id);
+    wsState.joinGame(id);
   };
 
   const handleLeaveGame = () => {
     if (wsState && gameState?.gameId) {
-      wsState.emit('leaveGame', { gameId: gameState.gameId });
+      wsState.makeMove(gameState.gameId, 'leave');
     }
   };
 
@@ -40,19 +41,19 @@ function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <div className="App">
-        {wsState?.error || gameError ? (
+        {(error || wsState.error || gameError) && (
           <div style={{ color: 'red', textAlign: 'center', padding: '1rem' }}>
-            {wsState?.error || gameError}
+            {error || wsState.error || gameError}
           </div>
-        ) : null}
+        )}
         
         {gameState ? (
           <GameRoom
             gameState={gameState}
             onMove={(from, to) => makeMove(from, to)}
             gameId={gameId}
-            isConnected={wsState?.isConnected}
-            error={wsState?.error || gameError}
+            isConnected={wsState.isConnected}
+            error={error || wsState.error || gameError}
             isWhitePlayer={isWhitePlayer}
             isBlackPlayer={isBlackPlayer}
             onLeaveGame={handleLeaveGame}

@@ -48,35 +48,41 @@ export const useSocket = () => {
 
     ws.onmessage = (event) => {
       try {
-        const serverEvent: ServerEvent = JSON.parse(event.data);
+        const data: ServerEvent = JSON.parse(event.data);
         
-        switch (serverEvent.type) {
+        switch (data.type) {
           case 'gameState':
-            if (serverEvent.state) {
-              setGameState(serverEvent.state);
+            if (data.state) {
+              setGameState(data.state);
             }
             break;
           case 'error':
-            if (serverEvent.message) {
-              setError(serverEvent.message);
+            if (data.message) {
+              setError(data.message);
             }
             break;
           case 'ping':
-            const pong: GameEvent = { type: 'pong' };
-            ws.send(JSON.stringify(pong));
+            ws.send(JSON.stringify({ type: 'pong' }));
             break;
         }
-      } catch (e) {
-        console.error('Error processing message:', e);
+      } catch (error) {
+        console.error('Error parsing message:', error);
       }
     };
   }, []);
+
+  useEffect(() => {
+    connect();
+    return () => {
+      wsRef.current?.close();
+    };
+  }, [connect]);
 
   const sendEvent = useCallback((event: GameEvent) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(event));
     } else {
-      setError('Not connected');
+      setError('Not connected to server');
     }
   }, []);
 
@@ -88,18 +94,16 @@ export const useSocket = () => {
     sendEvent({ type: 'move', gameId, move });
   }, [sendEvent]);
 
-  useEffect(() => {
-    connect();
-    return () => {
-      wsRef.current?.close();
-    };
-  }, [connect]);
+  const leaveGame = useCallback((gameId: string) => {
+    sendEvent({ type: 'leave', gameId });
+  }, [sendEvent]);
 
   return {
     isConnected,
     gameState,
     error,
     joinGame,
-    makeMove
+    makeMove,
+    leaveGame
   };
 };
