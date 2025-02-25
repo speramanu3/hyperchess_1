@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import { GameRoom } from './components/GameRoom';
-import { HomePage as Home } from './components/HomePage';
+import { HomePage } from './components/HomePage';
 import { darkTheme } from './theme';
 import { useSocket } from './hooks/useSocket';
 import { useGameState } from './hooks/useGameState';
@@ -58,7 +58,7 @@ function App() {
             onLeaveGame={handleLeaveGame}
           />
         ) : (
-          <Home
+          <HomePage
             onCreateGame={handleCreateGame}
             onJoinGame={handleJoinGame}
           />
