@@ -36,7 +36,7 @@ export const useGameState = (wsState: WebSocketState) => {
   };
 
   return {
-    gameState: wsState.gameState || initialState,
+    gameState: wsState.gameState,
     makeMove,
     error: error || wsState.error
   };
