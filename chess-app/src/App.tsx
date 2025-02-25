@@ -41,54 +41,52 @@ const initialGameState: GameState = {
 };
 
 function App() {
-  const socket = useSocket();
-  const { gameState, makeMove } = useGameState(socket);
-  const [showGame, setShowGame] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const wsState = useSocket();
+  const { gameState, makeMove, error: gameError } = useGameState(wsState);
+  const [gameId, setGameId] = useState<string>('');
 
   const handleCreateGame = () => {
-    if (!socket) {
-      setError('Unable to connect to server');
+    if (!wsState) {
+      wsState.setError('Unable to connect to server');
       return;
     }
-    socket.emit('createGame');
-    setShowGame(true);
+    wsState.emit('createGame');
   };
 
   const handleJoinGame = (gameId: string) => {
-    if (!socket) {
-      setError('Unable to connect to server');
+    if (!wsState) {
+      wsState.setError('Unable to connect to server');
       return;
     }
-    socket.emit('joinGame', gameId);
-    setShowGame(true);
+    wsState.emit('joinGame', gameId);
   };
 
   const handleLeaveGame = () => {
-    if (socket && gameState.gameId) {
-      socket.emit('leaveGame', { gameId: gameState.gameId });
+    if (wsState && gameState.gameId) {
+      wsState.emit('leaveGame', { gameId: gameState.gameId });
     }
-    setShowGame(false);
   };
 
-  const isWhitePlayer = socket?.id === gameState.players.white;
-  const isBlackPlayer = socket?.id === gameState.players.black;
+  const isWhitePlayer = wsState?.id === gameState.players.white;
+  const isBlackPlayer = wsState?.id === gameState.players.black;
 
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      {error && (
+      {wsState.error || gameError ? (
         <div style={{ color: 'red', textAlign: 'center', padding: '1rem' }}>
-          {error}
+          {wsState.error || gameError}
         </div>
-      )}
-      {showGame ? (
+      ) : null}
+      {gameState ? (
         <GameRoom 
           gameState={gameState}
           onMove={(from, to) => makeMove(from, to)}
+          gameId={gameId}
+          isConnected={wsState.isConnected}
+          error={wsState.error || gameError}
           isWhitePlayer={isWhitePlayer}
           isBlackPlayer={isBlackPlayer}
-          socket={socket}
           onLeaveGame={handleLeaveGame}
         />
       ) : (
