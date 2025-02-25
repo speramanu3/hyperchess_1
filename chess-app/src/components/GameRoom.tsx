@@ -315,7 +315,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({
   onLeaveGame
 }) => {
   const [showGameOverDialog, setShowGameOverDialog] = React.useState(false);
-  const [localGameState, setLocalGameState] = React.useState<GameState>(gameState);
+  const [localGameState, setLocalGameState] = React.useState<GameState | null>(gameState);
   const [gameOverMessage, setGameOverMessage] = React.useState('');
   const [capturedPieces, setCapturedPieces] = React.useState<{
     white: string[];
@@ -331,7 +331,8 @@ export const GameRoom: React.FC<GameRoomProps> = ({
     setLocalGameState(gameState);
   }, [gameState]);
 
-  const chess = new Chess(localGameState?.position);
+  const defaultFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const chess = new Chess(localGameState?.position || defaultFen);
   const isGameOver = chess.isCheckmate() || chess.isDraw();
   const winner = chess.isCheckmate() 
     ? (chess.turn() === 'w' ? 'Black' : 'White') 

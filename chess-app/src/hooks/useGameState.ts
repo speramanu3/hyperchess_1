@@ -3,7 +3,7 @@ import { GameState, WebSocketState } from '../types/game';
 
 const initialState: GameState = {
   gameId: '',
-  position: '',
+  position: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
   status: 'waiting',
   turn: 'w',
   players: {
