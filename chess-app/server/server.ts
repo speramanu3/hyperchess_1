@@ -8,6 +8,15 @@ import { Chess } from 'chess.js';
 const app = express();
 app.use(cors());
 
+// Add health check endpoint
+app.get('/', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
@@ -21,7 +30,18 @@ const io = new Server(httpServer, {
     allowedHeaders: ["my-custom-header"],
     credentials: true
   },
+  path: '/socket.io',
   transports: ['websocket', 'polling']
+});
+
+// Add error handling for the server
+httpServer.on('error', (error) => {
+  console.error('Server error:', error);
+});
+
+// Add error handling for socket.io
+io.on('error', (error) => {
+  console.error('Socket.io error:', error);
 });
 
 // Server configuration
@@ -203,12 +223,8 @@ io.on('connection', (socket) => {
         socket.join(gameId);
         
         games.set(gameId, game);
-<<<<<<< Updated upstream
-        io.to(gameId).emit('gameJoined', game);
-=======
         socket.emit('gameJoined', game);
         io.to(gameId).emit('gameState', game);
->>>>>>> Stashed changes
         logGameState('Player Joined');
       }
     } catch (error) {
@@ -226,7 +242,6 @@ io.on('connection', (socket) => {
       }
 
       const chess = new Chess(game.position);
-<<<<<<< Updated upstream
       
       // Verify it's the player's turn
       const isWhiteMove = chess.turn() === 'w';
@@ -346,7 +361,6 @@ io.on('connection', (socket) => {
         });
       }
 
->>>>>>> Stashed changes
     } catch (error) {
       console.error('Error making move:', error);
       socket.emit('error', 'Invalid move');
@@ -410,68 +424,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-<<<<<<< Updated upstream
-      switch (type) {
-        case 'move':
-          console.log(`Move in game ${gameId} by ${player}:`, move);
-          const chess = new Chess(game.position);
-          
-          // Get the piece at the target square before the move
-          const targetSquare = chess.get(move.to);
-
-          const result = chess.move({ from: move.from, to: move.to });
-          
-          if (result) {
-            game.position = chess.fen();
-            
-            // Initialize captures if they don't exist
-            if (!game.captures) {
-              game.captures = {
-                white: [],
-                black: []
-              };
-            }
-
-            // If there was a capture, add it to the appropriate list
-            if (targetSquare) {
-              const capturedPiece = `${targetSquare.type}_${targetSquare.color}`;
-              if (player === 'white') {
-                game.captures.black.push(capturedPiece);
-              } else {
-                game.captures.white.push(capturedPiece);
-              }
-            }
-            
-            // Check for checkmate or draw
-            let gameStatus = null;
-            if (chess.isCheckmate()) {
-              gameStatus = {
-                type: 'checkmate',
-                winner: player
-              };
-              game.status = 'completed';
-            } else if (chess.isDraw()) {
-              gameStatus = {
-                type: 'draw'
-              };
-              game.status = 'completed';
-            }
-
-            // Send move update and game status if game is over
-            io.to(gameId).emit('game_update', {
-              type: 'move',
-              move,
-              position: game.position,
-              gameStatus,
-              captures: game.captures
-            });
-          }
-          logGameState('After Move');
-          break;
-=======
       // Update activity time
       game.lastActivityTime = Date.now();
->>>>>>> Stashed changes
 
       switch (data.type) {
         case 'resign':
@@ -562,7 +516,8 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
+// Start the server
+const PORT = process.env.PORT || 3002;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

@@ -27,7 +27,7 @@ export const useSocket = (): WebSocketState => {
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const ws = new WebSocket(SOCKET_SERVER_URL);
+    const ws = new WebSocket(`${SOCKET_SERVER_URL}/socket.io/?EIO=4&transport=websocket`);
     wsRef.current = ws;
 
     ws.onopen = () => {
